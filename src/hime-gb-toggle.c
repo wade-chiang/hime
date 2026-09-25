@@ -52,10 +52,9 @@ int main (int argc, char **argv) {
         send_hime_message (GDK_DISPLAY (), KBM_TOGGLE);
 
     if (strstr (argv[0], "hime-exit")) {
-        Display *dpy = GDK_DISPLAY ();
-        if (find_hime_window (dpy) == None)
-            return 0;
-        send_hime_message (dpy, HIME_EXIT_MESSAGE);
+        // do not start a daemon only to make it exit
+        setenv ("HIME_IM_CLIENT_NO_AUTO_EXEC", "1", TRUE);
+        send_hime_message (GDK_DISPLAY (), HIME_EXIT_MESSAGE);
     }
 
     return 0;

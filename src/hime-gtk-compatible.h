@@ -30,9 +30,23 @@
 #ifndef HIME_GTK_COMPATIBLE_H
 #define HIME_GTK_COMPATIBLE_H
 
+// The X display, or NULL when GDK does not run on X11 (e.g. on Wayland)
+static inline Display *hime_gdk_x_display (void) {
+    GdkDisplay *display = gdk_display_get_default ();
+    if (!display) {
+        return NULL;
+    }
+#if GTK_CHECK_VERSION(3, 0, 0)
+    if (!GDK_IS_X11_DISPLAY (display)) {
+        return NULL;
+    }
+#endif
+    return GDK_DISPLAY_XDISPLAY (display);
+}
+
 // compat macro for Gtk+2/Gtk+3
 #undef GDK_DISPLAY
-#define GDK_DISPLAY() GDK_DISPLAY_XDISPLAY (gdk_display_get_default ())
+#define GDK_DISPLAY() hime_gdk_x_display ()
 
 // only in Gtk+2, compat for Gtk+3
 #if GTK_CHECK_VERSION(3, 0, 0)

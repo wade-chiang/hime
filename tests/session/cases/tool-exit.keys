@@ -1,0 +1,5 @@
+@tool hime-exit
+@exit 1
+# hime-exit, a Wayland client, stops the daemon: nothing accepts the next
+# client (which does not start a new daemon in the session tests).
+a

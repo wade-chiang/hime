@@ -9,6 +9,8 @@
 #                   gtk4-im-test, qt5-im-test and qt6-im-test go through
 #                   the IM modules)
 #   @x11            run the client on Xwayland instead of Wayland
+#   @tool NAME      run src/NAME (a hime tool, as a Wayland client) first
+#   @exit N         the client's expected exit status (default 0)
 #
 # Usage: run-tests.sh [--update]
 # Exits 77 (skipped) when mutter is not available.
@@ -16,6 +18,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
+top="$(cd "$here/../.." && pwd)"
 
 update=0
 [[ "${1:-}" == "--update" ]] && update=1
@@ -37,21 +40,32 @@ for keys in "$here"/cases/*.keys; do
 
     program=hime-client-test
     x11=""
+    tool=""
+    exit_status=0
     while read -r directive arg; do
         case "$directive" in
         @program) program="$arg" ;;
         @x11) x11=1 ;;
+        @tool) tool="$arg" ;;
+        @exit) exit_status="$arg" ;;
         esac
     done < <(grep '^@' "$keys")
+
+    cmd=("$here/$program" "${args[@]}")
+    if [[ -n "$tool" ]]; then
+        cmd=(sh -c '"$0" && exec "$@"' "$top/src/$tool" "${cmd[@]}")
+    fi
 
     if [[ ! -x "$here/$program" ]]; then
         echo "skip $name ($program not built)"
         continue
     fi
 
-    if ! HIME_SESSION_X11="$x11" "$here/run-session.sh" "$here/$program" "${args[@]}" \
-        >"$tmp/$name.actual" 2>"$tmp/$name.stderr"; then
-        echo "FAIL $name"
+    status=0
+    HIME_SESSION_X11="$x11" "$here/run-session.sh" "${cmd[@]}" \
+        >"$tmp/$name.actual" 2>"$tmp/$name.stderr" || status=$?
+    if [[ $status -ne $exit_status ]]; then
+        echo "FAIL $name (exit status $status, expected $exit_status)"
         grep -v -e dbus-daemon -e "connection to the bus" "$tmp/$name.stderr" || true
         fail=$((fail + 1))
         continue

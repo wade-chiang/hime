@@ -1,0 +1,4 @@
+@tool hime-sim
+# hime-sim, a Wayland client, switches the daemon to Simplified Chinese
+# output through the socket.
+e a <space>
