@@ -11,6 +11,7 @@ autoreconf -fi            # the repo lacks install-sh/compile/missing
 ./configure --with-gtk=3.0 --prefix=/usr --disable-system-tray
 make -j$(nproc)
 make check                # gtab characterization tests
+make check-session        # end-to-end tests in a headless mutter session
 ```
 
 - Build the daemon against GTK 3. The configure default is GTK 2, which has
@@ -42,7 +43,16 @@ make check                # gtab characterization tests
   the repo; put it and cases using it in the git-ignored `tests/gtab/local/`
   and run `tests/gtab/run-tests.sh tests/gtab/local/*.keys`.
 
-Run `make check` after any change to the engine or key handling. Only run
+`tests/session/` runs the real daemon on the Xwayland of a private
+headless mutter (`run-session.sh`, needs mutter and dbus-run-session) and
+types through `libhime-im-client` from a client with no X display, as a
+native Wayland application. `cases/*.keys` / `*.expected` work like the
+gtab ones. Use `run-session.sh CMD` to run anything else in such a
+session (e.g. a GTK app with `GTK_IM_MODULE=hime`).
+
+Run `make check` after any change to the engine or key handling, and
+`make check-session` after changes to the daemon, `src/im-client/` or the
+IM modules. Only run
 `run-tests.sh --update` when a behavior change is intended, and show the
 diff of the `.expected` files when reporting it.
 
@@ -65,8 +75,11 @@ the input but leaves the candidate row shown.
 - `src/eve.c`: key dispatch (`ProcessKeyPress`), client state, commit
   buffer (`send_text`), input method switching (`init_in_method`).
 - `src/im-srv.c`, `src/im-dispatch.c`: socket server for the IM modules.
-- `src/im-client/`: client library used by the GTK/Qt modules; finds the
-  daemon through an X selection (`find_hime_window`).
+- `src/im-client/`: client library used by the GTK/Qt modules and the
+  tools. It connects to the daemon's socket at
+  `$XDG_RUNTIME_DIR/hime/<name>.socket` (`get_hime_im_srv_sock_path` in
+  `src/im-addr.c`), starting the daemon if needed; only the TCP remote
+  mode still finds the daemon through X11.
 - `src/gtab*.c`: table engine; `src/win-gtab.c` is its window.
 - `src/pho*.c`, `src/tsin*.c`: Zhuyin and phrase (tsin) engines.
 - `src/modules/`: loadable modules (Anthy, Chewing, intcode).
@@ -110,5 +123,7 @@ Every phase must keep `make check` green without `--update`.
   table's directory with a relative name.
 - `hime-tsin2gtab-phrase` reads `tsin32` only from `~/.config/hime`, and
   the daemon runs helper tools from the hard-coded `HIME_BIN_DIR`.
+- `src/im-client/` compiles its own copies of `src/*.c` files; the src
+  Makefile always recurses into it so they get rebuilt.
 - The daemon reads config from `$HOME/.config/hime`; tests isolate it by
   pointing `HOME` at a temp dir and `HIME_TABLE_DIR` at `data/`.

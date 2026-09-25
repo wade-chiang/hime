@@ -1,0 +1,4 @@
+# A client without an X display, as a native Wayland application: typing
+# with the synthetic Boshiamy-shaped table through the daemon's socket.
+b 1 a <space> c 2 , <space>
+b c d e f <space>

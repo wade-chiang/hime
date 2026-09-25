@@ -67,3 +67,4 @@ missing
 # gtab characterization tests
 tests/gtab/gtab-harness
 tests/gtab/local/
+tests/session/hime-client-test

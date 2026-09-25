@@ -244,6 +244,15 @@ $(GTAB_HARNESS): ../tests/gtab/harness.o $(GTAB_HARNESS_OBJS) $(IMdkitLIB) $(OBJ
 .PHONY: gtab-harness
 gtab-harness: $(GTAB_HARNESS)
 
+# A client without an X display for the session tests (tests/session/).
+HIME_CLIENT_TEST = ../tests/session/hime-client-test
+
+$(HIME_CLIENT_TEST): ../tests/session/hime-client-test.c im-client/libhime-im-client.so
+	$(CC) $(CFLAGS) -I./im-client -o $@ $< -L./im-client -lhime-im-client $(LDFLAGS)
+
+.PHONY: hime-client-test
+hime-client-test: $(HIME_CLIENT_TEST)
+
 hime-tslearn: $(OBJS_TSLEARN) im-client/libhime-im-client.so
 	@echo "linking $@ ..."
 	$(CCLD) $(gcc_ld_run_path) -o $@ $^ -L./im-client -lhime-im-client \
@@ -383,5 +392,5 @@ clean:
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im clean; fi
 	@rm -f *.o *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
-		$(GTAB_HARNESS) ../tests/gtab/harness.o
+		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST)
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;

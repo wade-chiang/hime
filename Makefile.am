@@ -39,6 +39,11 @@ check:
 	$(MAKE) -C src hime-cin2gtab hime-tsin2gtab-phrase hime-tsa2d32 gtab-harness
 	./tests/gtab/run-tests.sh
 
+.PHONY: check-session
+check-session:
+	$(MAKE) -C src hime hime-cin2gtab hime-client-test
+	./tests/session/run-tests.sh
+
 .PHONY: clang-format
 clang-format:
 	./scripts/format_code.py
