@@ -210,6 +210,11 @@ char *get_hime_xim_name (void) {
         if ((p = strchr (sstr, '.')))
             *p = 0;
 
+        // XMODIFIERS may name another input method, e.g. @im=ibus, which
+        // GNOME sets: taking its name would clash with its XIM server.
+        if (strncmp (sstr, "hime", 4))
+            return "hime";
+
         //    dbg("Try to use name from XMODIFIERS=@im=%s\n", sstr);
         return sstr;
     }

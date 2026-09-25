@@ -572,6 +572,18 @@ static void screen_size_changed (GdkScreen *screen, gpointer user_data) {
 #include "lang.h"
 
 int main (int argc, char **argv) {
+    // Daemonize before gtk_init: GTK starts GLib worker threads (GDBus), and
+    // a child forked after that only has the main thread, so it hangs on the
+    // first D-Bus call (e.g. gvfs, while loading the theme).
+    if (getenv ("HIME_DAEMON")) {
+        daemon (1, 1);
+#if FREEBSD
+        setpgid (0, getpid ());
+#else
+        setpgrp ();
+#endif
+    }
+
 #if GTK_CHECK_VERSION(3, 10, 0)
     // The daemon's windows and XIM still need X11; on a Wayland desktop run
     // on Xwayland even when started from a native Wayland client.
@@ -581,15 +593,6 @@ int main (int argc, char **argv) {
 
     signal (SIGCHLD, SIG_IGN);
     signal (SIGPIPE, SIG_IGN);
-
-    if (getenv ("HIME_DAEMON")) {
-        daemon (1, 1);
-#if FREEBSD
-        setpgid (0, getpid ());
-#else
-        setpgrp ();
-#endif
-    }
 
     set_is_chs ();
 
