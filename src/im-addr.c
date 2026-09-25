@@ -29,32 +29,29 @@ Atom get_hime_sockpath_atom (Display *display) {
     return get_atom_by_name (display, "HIME_SOCKPATH_ATOM_%s");
 }
 
-// socket name: /tmp/.hime-$USER/socket-:0.0-hime
+// socket name: $XDG_RUNTIME_DIR/hime/hime.socket, or /tmp/.hime-$USER/hime.socket
+// when XDG_RUNTIME_DIR is unset.  The file name is the XIM name
+// (XMODIFIERS=@im=...).  Both the daemon and the clients use this path, so
+// clients can find the daemon without X11.  outstr is empty on failure.
 void get_hime_im_srv_sock_path (char *outstr, const int outstrN) {
-    const char *display = getenv ("DISPLAY");
+    outstr[0] = '\0';
+
     const int uid = getuid ();
-
-    if (!display || (strcmp (display, ":0") == 0)) {
-        display = ":0.0";
-    }
-
-    const int DISPLAY_NAME_SIZE = 64;
-    char tdisplay[DISPLAY_NAME_SIZE];
-    strncpy (tdisplay, display, sizeof (tdisplay));
-
-    if (!strchr (display, ':')) {
-        strcat (tdisplay, ":0");
-    }
-    if (!strchr (display, '.')) {
-        strcat (tdisplay, ".0");
-    }
 
     const int DIR_NAME_SIZE = 128;
     char my_dir[DIR_NAME_SIZE];
 
-    struct passwd *pw = getpwuid (uid);
-    const gchar *tmpdir = g_get_tmp_dir ();
-    snprintf (my_dir, sizeof (my_dir), "%s/.hime-%s", tmpdir, pw->pw_name);
+    const char *runtime_dir = getenv ("XDG_RUNTIME_DIR");
+    if (runtime_dir && runtime_dir[0]) {
+        snprintf (my_dir, sizeof (my_dir), "%s/hime", runtime_dir);
+    } else {
+        struct passwd *pw = getpwuid (uid);
+        if (!pw) {
+            return;
+        }
+        snprintf (my_dir, sizeof (my_dir), "%s/.hime-%s", g_get_tmp_dir (), pw->pw_name);
+    }
+
     struct stat st;
 
     // my_dir doesn't exist, create one
@@ -67,7 +64,5 @@ void get_hime_im_srv_sock_path (char *outstr, const int outstrN) {
         }
     }
 
-    snprintf (outstr, outstrN,
-              "%s/socket-%s-%s",
-              my_dir, tdisplay, get_hime_xim_name ());
+    snprintf (outstr, outstrN, "%s/%s.socket", my_dir, get_hime_xim_name ());
 }

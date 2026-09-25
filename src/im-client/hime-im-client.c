@@ -86,17 +86,6 @@ static unsigned char *get_window_property (Display *display,
     return prop_return;
 }
 
-static unsigned char *get_sockpath_atom (Display *display, Window hime_win) {
-
-    Atom hime_sockpath_atom = get_hime_sockpath_atom (display);
-
-    if (!hime_sockpath_atom) {
-        return NULL;
-    }
-
-    return get_window_property (display, hime_win, hime_sockpath_atom);
-}
-
 static unsigned char *get_addr_atom (Display *display, Window hime_win) {
 
     Atom hime_addr_atom = get_hime_addr_atom (display);
@@ -108,25 +97,62 @@ static unsigned char *get_addr_atom (Display *display, Window hime_win) {
     return get_window_property (display, hime_win, hime_addr_atom);
 }
 
-static void init_unix_serv_addr (const unsigned char *message_sock,
-                                 struct sockaddr_un *serv_addr) {
-
-    memset (serv_addr, 0, sizeof (*serv_addr));
-
-    serv_addr->sun_family = AF_UNIX;
-
-    Server_sock_path srv_sock_path;
-    srv_sock_path.sock_path[0] = '\0';
-    memcpy (&srv_sock_path, message_sock, sizeof (srv_sock_path));
-
+// connect to the daemon's UNIX socket at its well-known path; 0 on failure
+static int connect_unix_socket (void) {
     char sock_path[UNIX_PATH_MAX];
-    if (srv_sock_path.sock_path[0]) {
-        strncpy (sock_path, srv_sock_path.sock_path, UNIX_PATH_MAX);
-    } else {
-        get_hime_im_srv_sock_path (sock_path, sizeof (sock_path));
+    get_hime_im_srv_sock_path (sock_path, sizeof (sock_path));
+    if (!sock_path[0]) {
+        return 0;
     }
 
-    strcpy (serv_addr->sun_path, sock_path);
+    struct sockaddr_un serv_addr;
+    memset (&serv_addr, 0, sizeof (serv_addr));
+    serv_addr.sun_family = AF_UNIX;
+    strncpy (serv_addr.sun_path, sock_path, sizeof (serv_addr.sun_path) - 1);
+
+    const int sockfd = socket (AF_UNIX, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror ("cannot open UNIX domain socket");
+        return 0;
+    }
+
+    if (connect (sockfd, (struct sockaddr *) &serv_addr, SUN_LEN (&serv_addr)) < 0) {
+        close (sockfd);
+        return 0;
+    }
+
+    dbg ("connected to unix socket addr %s\n", serv_addr.sun_path);
+    return sockfd;
+}
+
+// start the daemon, at most once every few seconds; TRUE if it was started
+// and survived until it daemonized
+static gboolean start_hime_server (void) {
+    static time_t exec_time;
+
+    if (time (NULL) - exec_time < 5) {
+        return FALSE;
+    }
+    time (&exec_time);
+
+    static char execbin[] = HIME_BIN_DIR "/hime";
+    dbg ("... try to start a new hime server %s\n", execbin);
+
+    const pid_t pid = fork ();
+    if (pid < 0) {
+        return FALSE;
+    }
+
+    if (pid == 0) {
+        setenv ("HIME_DAEMON", "", TRUE);
+        execl (execbin, "hime", NULL);
+        _exit (127);
+    }
+
+    // hime will daemon() once it is initialized
+    int status = 0;
+    waitpid (pid, &status, 0);
+    return WIFEXITED (status) && WEXITSTATUS (status) == 0;
 }
 
 static void init_ipv4_serv_addr (const Server_IP_port *srv_ip_port,
@@ -153,99 +179,47 @@ static HIME_client_handle *hime_im_client_reopen (HIME_client_handle *hime_ch,
     int ipv4 = FALSE;
     Server_IP_port srv_ip_port;
 
-    if (!display) {
-        dbg ("display is null\n");
-        goto next;
-    }
-
-    Window hime_win = None;
-
-    const int MAX_TRY = 3;
-    int loop = 0;
-
-    // obtain hime_win and fork
-    if (!is_special_user ()) {
-        for (loop = 0; loop < MAX_TRY; loop++) {
-            if ((hime_win = find_hime_window (display)) != None ||
-                getenv ("HIME_IM_CLIENT_NO_AUTO_EXEC")) {
-                break;
-            }
-            static time_t exec_time;
-
-            if (time (NULL) - exec_time > 1) {
-                time (&exec_time);
-
-                dbg ("XGetSelectionOwner: old version of hime or hime is not running ?\n");
-
-                static char execbin[] = HIME_BIN_DIR "/hime";
-                dbg ("... try to start a new hime server %s\n", execbin);
-
-                int pid;
-
-                if ((pid = fork ()) == 0) {
-                    setenv ("HIME_DAEMON", "", TRUE);
-                    execl (execbin, "hime", NULL);
-                } else {
-                    int status;
-                    // hime will daemon()
-                    waitpid (pid, &status, 0);
-                }
-            }
-        }
-    }
-
-    if (loop == MAX_TRY || hime_win == None) {
-        goto next;
-    }
-
-    // -----------------------------------------------------------------------
-    // The below logic tries to prepare a valid sockfd.
-    //
-    // we try to create UNIX domain socket first,
-    // (if failed,) we try to create a IPv4 socket (ipv4 flag will be set).
-    // -----------------------------------------------------------------------
-
     // -----------------------------------------------------------------------
     // trying to create a UNIX domain socket (AF_UNIX) connection
     // -----------------------------------------------------------------------
 
-    // get HIME socket path from X window (HIME_SOCKPATH_ATOM)
-    unsigned char *unix_message_sock = get_sockpath_atom (display, hime_win);
-    if (!unix_message_sock) {
-        dbg ("[UNIX] XGetWindowProperty: old version of hime or hime is not running ?\n");
+    sockfd = connect_unix_socket ();
+
+    if (!sockfd && !is_special_user () && !getenv ("HIME_IM_CLIENT_NO_AUTO_EXEC") &&
+        start_hime_server ()) {
+        // the daemon opens its socket shortly after it daemonizes
+        const int MAX_TRY = 30;
+        int loop;
+        for (loop = 0; loop < MAX_TRY && !sockfd; loop++) {
+            usleep (100000);
+            sockfd = connect_unix_socket ();
+        }
+    }
+
+    if (sockfd) {
+        // we are now connected to a UNIX domain socket
         goto next;
     }
 
-    // UNIX domain socket (AF_UNIX)
-    struct sockaddr_un serv_addr;
-    init_unix_serv_addr (unix_message_sock, &serv_addr);
-    XFree (unix_message_sock);
-    unix_message_sock = NULL;
-
-    if ((sockfd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
-        perror ("cannot open UNIX domain socket");
-        goto tcp;
-    }
-
-    if (connect (sockfd, (struct sockaddr *) &serv_addr, SUN_LEN (&serv_addr)) < 0) {
-        perror ("cannot connect to UNIX domain socket");
-        close (sockfd);
-        sockfd = 0;
-        goto tcp;
-    }
-
     if (dbg_msg) {
-        dbg ("connected to unix socket addr %s\n", serv_addr.sun_path);
+        dbg ("cannot connect to the hime UNIX domain socket\n");
     }
 
-    // we are now connected to a UNIX domain socket
-    goto next;
-
-tcp:;
     // -----------------------------------------------------------------------
     // trying to create a IPv4 socket (AF_INET) connection
     // -----------------------------------------------------------------------
     //
+    // hime publishes its TCP address (hime-remote-client) as a property of its
+    // X window, so this needs an X display.
+    if (!display) {
+        goto next;
+    }
+
+    Window hime_win = find_hime_window (display);
+    if (hime_win == None) {
+        goto next;
+    }
+
     // get HIME address from X window (HIME_ADDR_ATOM)
     unsigned char *ipv4_message_sock = get_addr_atom (display, hime_win);
     if (!ipv4_message_sock) {

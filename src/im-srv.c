@@ -137,6 +137,19 @@ static void init_unix_socket (struct sockaddr_un *serv_addr,
     dbg ("-- %s\n", serv_addr->sun_path);
 }
 
+static gboolean is_sock_path_in_use (const struct sockaddr_un *serv_addr) {
+    // another hime is running if something accepts connections on the path
+
+    const int sockfd = socket (AF_UNIX, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        return FALSE;
+    }
+
+    const gboolean in_use = connect (sockfd, (const struct sockaddr *) serv_addr, SUN_LEN (serv_addr)) == 0;
+    close (sockfd);
+    return in_use;
+}
+
 static void unlink_serv_addr_sock_path (const struct sockaddr_un *serv_addr) {
     // unlink (remove) the old socket path if exists
 
@@ -182,9 +195,19 @@ static void setup_unix_domain_socket (void) {
 
     char sock_path[UNIX_PATH_MAX];
     get_hime_im_srv_sock_path (sock_path, sizeof (sock_path));
+    if (!sock_path[0]) {
+        fprintf (stderr, "hime: cannot determine the socket path\n");
+        exit (-1);
+    }
 
     struct sockaddr_un serv_addr;
     init_unix_socket (&serv_addr, sock_path);
+
+    if (is_sock_path_in_use (&serv_addr)) {
+        fprintf (stderr, "hime: another hime is already running on %s\n", sock_path);
+        exit (0);
+    }
+
     unlink_serv_addr_sock_path (&serv_addr);
 
     if ((im_sockfd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
