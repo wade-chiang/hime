@@ -12,6 +12,14 @@ c        eat
 <space>  eat  commit="二"
 ,        eat 
 <space>  eat  commit="，"
+S-h      eat  commit="H"
+S-i      eat  commit="I"
+<space>  pass
+C-<space> eat 
+a        pass
+C-<space> eat 
+a        eat 
+<space>  eat  commit="一"
 module=QHimePlatformInputContext
 platform=wayland
 focus=yes

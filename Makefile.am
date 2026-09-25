@@ -42,7 +42,7 @@ check:
 .PHONY: check-session
 check-session:
 	$(MAKE) -C src all hime-cin2gtab session-test-programs
-	./tests/session/run-tests.sh
+	./tests/session/run-tests.sh || test $$? -eq 77
 
 .PHONY: clang-format
 clang-format:

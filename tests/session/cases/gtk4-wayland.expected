@@ -12,5 +12,13 @@ c        eat
 <space>  eat  commit="二"
 ,        eat 
 <space>  eat  commit="，"
+S-h      eat  commit="H"
+S-i      eat  commit="I"
+<space>  eat  commit=" "
+C-<space> eat 
+a        eat  commit="a"
+C-<space> eat 
+a        eat 
+<space>  eat  commit="一"
 module=hime
 backend=GdkWaylandDisplay

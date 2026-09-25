@@ -2,3 +2,5 @@
 # A native Wayland GTK 3 application typing through the HIME IM module.
 b 1 a <space> c 2 x <space>
 b c <bs> <space> , <space>
+# Shift types English; Control+Space turns the input method off and on
+S-h S-i <space> C-<space> a C-<space> a <space>

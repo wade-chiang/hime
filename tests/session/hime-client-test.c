@@ -23,7 +23,7 @@
  *
  * Usage: hime-client-test [-m MESSAGE] KEY...
  *   KEY is a single printable character or one of <space> <enter> <bs>
- *   <esc>.  @1 and @2 move the focus to the first or a second client
+ *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).  @1 and @2 move the focus to the first or a second client
  *   connection (two text fields, both without an X window); @new closes
  *   the focused connection and focuses a new one in its place (an
  *   application quits, another starts).  -m sends a daemon message (as
@@ -41,7 +41,7 @@
 
 #include "hime-im-client.h"
 
-static KeySym parse_key (const char *tok) {
+static KeySym parse_key (const char *tok, uint32_t *state) {
     static const struct {
         const char *name;
         KeySym sym;
@@ -52,13 +52,26 @@ static KeySym parse_key (const char *tok) {
         {"<esc>", XK_Escape},
     };
 
+    *state = 0;
+    for (;;) {
+        if (!strncmp (tok, "S-", 2) && tok[2])
+            *state |= ShiftMask;
+        else if (!strncmp (tok, "C-", 2) && tok[2])
+            *state |= ControlMask;
+        else
+            break;
+        tok += 2;
+    }
+
     size_t i;
     for (i = 0; i < sizeof (named_keys) / sizeof (named_keys[0]); i++)
         if (!strcmp (tok, named_keys[i].name))
             return named_keys[i].sym;
 
-    if (strlen (tok) == 1 && tok[0] > ' ' && tok[0] < 127)
-        return (KeySym) tok[0];
+    if (strlen (tok) == 1 && tok[0] > ' ' && tok[0] < 127) {
+        // X reports Shift+a as XK_A
+        return (*state & ShiftMask) && tok[0] >= 'a' && tok[0] <= 'z' ? (KeySym) (tok[0] - 'a' + 'A') : (KeySym) tok[0];
+    }
 
     return NoSymbol;
 }
@@ -105,16 +118,17 @@ int main (int argc, char **argv) {
             continue;
         }
 
-        KeySym key = parse_key (argv[argi]);
+        uint32_t state;
+        KeySym key = parse_key (argv[argi], &state);
         if (key == NoSymbol) {
             fprintf (stderr, "bad key: %s\n", argv[argi]);
             return 2;
         }
 
         char *commit = NULL;
-        int eaten = hime_im_client_forward_key_press (handle, key, 0, &commit);
+        int eaten = hime_im_client_forward_key_press (handle, key, state, &commit);
         char *release = NULL;
-        hime_im_client_forward_key_release (handle, key, 0, &release);
+        hime_im_client_forward_key_release (handle, key, state, &release);
 
         printf ("%-8s %s", argv[argi], eaten ? "eat " : "pass");
         if (commit && commit[0])

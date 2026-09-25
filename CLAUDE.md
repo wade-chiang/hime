@@ -118,6 +118,18 @@ runtime from hime-setup, as on X11 (`hime-input-style`, applied by
 
 Every phase must keep `make check` green without `--update`.
 
+Known gaps after phase 1 (from review, not fixed yet):
+
+- GTK 4 has no Mod2-Mod5 modifier masks, so AltGr (Mod5) and NumLock
+  (Mod2) never reach the daemon from GTK 4 applications.
+- The daemon auto-start path (`start_hime_server` in
+  `src/im-client/hime-im-client.c`) is not covered by tests: the session
+  tests disable it and the daemon path is fixed at build time.
+- Socket paths longer than `sun_path` (108 bytes) are silently
+  truncated, the same way on both sides.
+- The GTK modules assume GDK was built with the X11 backend.
+- Qt 5 on Wayland is untested (qt5-wayland is not installed here).
+
 ## Gotchas
 
 - Do not add `-DGTK_DISABLE_DEPRECATED` to GTK 3 builds: HIME still calls

@@ -12,3 +12,11 @@ d        eat
 e        eat 
 f        eat  commit="五"
 <space>  eat  commit="山"
+S-h      eat  commit="H"
+S-i      eat  commit="I"
+<space>  pass
+C-<space> eat 
+a        pass
+C-<space> eat 
+a        eat 
+<space>  eat  commit="一"

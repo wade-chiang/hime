@@ -34,6 +34,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 pass=0
 fail=0
+skip=0
 for keys in "$here"/cases/*.keys; do
     name="$(basename "$keys" .keys)"
     expected="${keys%.keys}.expected"
@@ -64,6 +65,7 @@ for keys in "$here"/cases/*.keys; do
 
     if [[ ! -x "$here/$program" ]]; then
         echo "skip $name ($program not built)"
+        skip=$((skip + 1))
         continue
     fi
 
@@ -88,5 +90,5 @@ for keys in "$here"/cases/*.keys; do
     fi
 done
 
-[[ $update -eq 1 ]] || echo "session tests: $pass passed, $fail failed"
+[[ $update -eq 1 ]] || echo "session tests: $pass passed, $fail failed, $skip skipped"
 [[ $fail -eq 0 ]]

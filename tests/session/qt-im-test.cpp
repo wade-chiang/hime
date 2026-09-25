@@ -24,7 +24,7 @@
  *
  * Usage: qt{5,6}-im-test KEY...
  *   KEY is a single printable character or one of <space> <enter> <bs>
- *   <esc>.
+ *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).
  */
 
 #include <stdio.h>
@@ -64,9 +64,26 @@ struct Key {
     int qt_key;
     quint32 keysym;
     QString text;
+    Qt::KeyboardModifiers modifiers;
+    quint32 native_modifiers;  // X core mask layout, as xcb and QtWayland report
 };
 
 static bool parse_key (const char *tok, Key *key) {
+    Qt::KeyboardModifiers modifiers = Qt::NoModifier;
+    quint32 native_modifiers = 0;
+    for (;;) {
+        if (!strncmp (tok, "S-", 2) && tok[2]) {
+            modifiers |= Qt::ShiftModifier;
+            native_modifiers |= 1;  // ShiftMask
+        } else if (!strncmp (tok, "C-", 2) && tok[2]) {
+            modifiers |= Qt::ControlModifier;
+            native_modifiers |= 4;  // ControlMask
+        } else {
+            break;
+        }
+        tok += 2;
+    }
+
     static const struct {
         const char *name;
         int qt_key;
@@ -81,15 +98,18 @@ static bool parse_key (const char *tok, Key *key) {
 
     for (size_t i = 0; i < sizeof (named_keys) / sizeof (named_keys[0]); i++) {
         if (!strcmp (tok, named_keys[i].name)) {
-            *key = {named_keys[i].qt_key, named_keys[i].keysym, QString::fromLatin1 (named_keys[i].text)};
+            *key = {named_keys[i].qt_key, named_keys[i].keysym, QString::fromLatin1 (named_keys[i].text), modifiers, native_modifiers};
             return true;
         }
     }
 
     if (strlen (tok) == 1 && tok[0] > ' ' && tok[0] < 127) {
-        // Latin-1 keysyms equal their character codes
-        const QChar c = QLatin1Char (tok[0]);
-        *key = {c.toUpper ().unicode (), (quint32) tok[0], QString (c)};
+        // Latin-1 keysyms equal their character codes; the keysym is
+        // translated for Shift, as the platform plugins report it
+        QChar c = QLatin1Char (tok[0]);
+        if (modifiers & Qt::ShiftModifier)
+            c = c.toUpper ();
+        *key = {c.toUpper ().unicode (), (quint32) c.unicode (), QString (c), modifiers, native_modifiers};
         return true;
     }
 
@@ -127,9 +147,9 @@ int main (int argc, char **argv) {
         }
 
         window.commits.clear ();
-        QKeyEvent press (QEvent::KeyPress, key.qt_key, Qt::NoModifier, 0, key.keysym, 0, key.text);
+        QKeyEvent press (QEvent::KeyPress, key.qt_key, key.modifiers, 0, key.keysym, key.native_modifiers, key.text);
         const bool eaten = context->filterEvent (&press);
-        QKeyEvent release (QEvent::KeyRelease, key.qt_key, Qt::NoModifier, 0, key.keysym, 0, key.text);
+        QKeyEvent release (QEvent::KeyRelease, key.qt_key, key.modifiers, 0, key.keysym, key.native_modifiers, key.text);
         context->filterEvent (&release);
 
         printf ("%-8s %s", argv[i], eaten ? "eat " : "pass");

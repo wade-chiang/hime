@@ -24,7 +24,7 @@
  *
  * Usage: gtk{3,4}-im-test KEY...
  *   KEY is a single printable character or one of <space> <enter> <bs>
- *   <esc>.
+ *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).
  */
 
 #include <stdio.h>
@@ -38,7 +38,7 @@ static void on_commit (GtkIMContext *context, const char *str, gpointer data) {
     g_string_append (commits, str);
 }
 
-static guint parse_key (const char *tok) {
+static guint parse_key (const char *tok, GdkModifierType *state) {
     static const struct {
         const char *name;
         guint keyval;
@@ -49,13 +49,27 @@ static guint parse_key (const char *tok) {
         {"<esc>", GDK_KEY_Escape},
     };
 
+    *state = 0;
+    for (;;) {
+        if (!strncmp (tok, "S-", 2) && tok[2])
+            *state |= GDK_SHIFT_MASK;
+        else if (!strncmp (tok, "C-", 2) && tok[2])
+            *state |= GDK_CONTROL_MASK;
+        else
+            break;
+        tok += 2;
+    }
+
     size_t i;
     for (i = 0; i < G_N_ELEMENTS (named_keys); i++)
         if (!strcmp (tok, named_keys[i].name))
             return named_keys[i].keyval;
 
-    if (strlen (tok) == 1 && tok[0] > ' ' && tok[0] < 127)
-        return gdk_unicode_to_keyval (tok[0]);
+    if (strlen (tok) == 1 && tok[0] > ' ' && tok[0] < 127) {
+        // the key value is translated for the modifiers, as GDK reports it
+        const char c = (*state & GDK_SHIFT_MASK) && tok[0] >= 'a' && tok[0] <= 'z' ? tok[0] - 'a' + 'A' : tok[0];
+        return gdk_unicode_to_keyval (c);
+    }
 
     return GDK_KEY_VoidSymbol;
 }
@@ -72,7 +86,7 @@ static void setup (GtkIMContext *context) {
     gtk_im_context_set_client_widget (context, text);
 }
 
-static gboolean send_key (GtkIMContext *context, guint keyval, gboolean press) {
+static gboolean send_key (GtkIMContext *context, guint keyval, GdkModifierType state, gboolean press) {
     GdkDisplay *display = gtk_widget_get_display (window);
     GdkKeymapKey *keys = NULL;
     int n_keys = 0;
@@ -87,7 +101,7 @@ static gboolean send_key (GtkIMContext *context, guint keyval, gboolean press) {
     GdkSurface *surface = gtk_native_get_surface (GTK_NATIVE (window));
 
     return gtk_im_context_filter_key (context, press, surface, keyboard,
-                                      GDK_CURRENT_TIME, keycode, 0, group);
+                                      GDK_CURRENT_TIME, keycode, state, group);
 }
 
 #else
@@ -100,12 +114,13 @@ static void setup (GtkIMContext *context) {
     gtk_im_context_set_client_window (context, gtk_widget_get_window (window));
 }
 
-static gboolean send_key (GtkIMContext *context, guint keyval, gboolean press) {
+static gboolean send_key (GtkIMContext *context, guint keyval, GdkModifierType state, gboolean press) {
     GdkWindow *gdk_window = gtk_widget_get_window (window);
     GdkEvent *event = gdk_event_new (press ? GDK_KEY_PRESS : GDK_KEY_RELEASE);
     event->key.window = g_object_ref (gdk_window);
     event->key.time = GDK_CURRENT_TIME;
     event->key.keyval = keyval;
+    event->key.state = state;
 
     GdkKeymapKey *keys = NULL;
     int n_keys = 0;
@@ -142,15 +157,16 @@ int main (int argc, char **argv) {
 
     int i;
     for (i = 1; i < argc; i++) {
-        guint keyval = parse_key (argv[i]);
+        GdkModifierType state;
+        guint keyval = parse_key (argv[i], &state);
         if (keyval == GDK_KEY_VoidSymbol) {
             fprintf (stderr, "bad key: %s\n", argv[i]);
             return 2;
         }
 
         g_string_truncate (commits, 0);
-        const gboolean eaten = send_key (context, keyval, TRUE);
-        send_key (context, keyval, FALSE);
+        const gboolean eaten = send_key (context, keyval, state, TRUE);
+        send_key (context, keyval, state, FALSE);
 
         printf ("%-8s %s", argv[i], eaten ? "eat " : "pass");
         if (commits->len)
