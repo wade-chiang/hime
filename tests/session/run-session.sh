@@ -115,8 +115,21 @@ if [[ -f "$top/src/gtk4-im/libim-hime.so" ]]; then
     export GTK_PATH="$tmp/gtk-path"
 fi
 
+# Qt finds platform input contexts in $QT_PLUGIN_PATH/platforminputcontexts;
+# Qt 5 and Qt 6 each skip the other's plugin.
+export QT_IM_MODULE=hime QT_QPA_PLATFORM=wayland
+qt_plugin_path=""
+for qt in qt5 qt6; do
+    if [[ -f "$top/src/$qt-im/im-hime.so" ]]; then
+        mkdir -p "$tmp/$qt-plugins/platforminputcontexts"
+        ln -sf "$top/src/$qt-im/im-hime.so" "$tmp/$qt-plugins/platforminputcontexts/"
+        qt_plugin_path="$qt_plugin_path${qt_plugin_path:+:}$tmp/$qt-plugins"
+    fi
+done
+export QT_PLUGIN_PATH="$qt_plugin_path"
+
 if [[ "${HIME_SESSION_X11:-}" == 1 ]]; then
-    export DISPLAY="$x_display" XAUTHORITY="$x_auth" GDK_BACKEND=x11
+    export DISPLAY="$x_display" XAUTHORITY="$x_auth" GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb
 fi
 
 "$@"

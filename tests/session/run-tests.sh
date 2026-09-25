@@ -5,8 +5,9 @@
 # Lines starting with # are comments.  Directives:
 #
 #   @program NAME   the client typing the keys (default hime-client-test,
-#                   a client without an X display; gtk3-im-test and
-#                   gtk4-im-test go through the GTK IM modules)
+#                   a client without an X display; gtk3-im-test,
+#                   gtk4-im-test, qt5-im-test and qt6-im-test go through
+#                   the IM modules)
 #   @x11            run the client on Xwayland instead of Wayland
 #
 # Usage: run-tests.sh [--update]
@@ -42,6 +43,11 @@ for keys in "$here"/cases/*.keys; do
         @x11) x11=1 ;;
         esac
     done < <(grep '^@' "$keys")
+
+    if [[ ! -x "$here/$program" ]]; then
+        echo "skip $name ($program not built)"
+        continue
+    fi
 
     if ! HIME_SESSION_X11="$x11" "$here/run-session.sh" "$here/$program" "${args[@]}" \
         >"$tmp/$name.actual" 2>"$tmp/$name.stderr"; then

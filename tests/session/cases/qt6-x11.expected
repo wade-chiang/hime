@@ -1,0 +1,17 @@
+b        eat 
+1        eat  commit="八"
+a        eat 
+<space>  eat  commit="一"
+c        eat 
+2        eat  commit="中"
+x        eat 
+<space>  pass
+b        eat 
+c        eat 
+<bs>     eat 
+<space>  eat  commit="二"
+,        eat 
+<space>  eat  commit="，"
+module=QHimePlatformInputContext
+platform=xcb
+focus=yes

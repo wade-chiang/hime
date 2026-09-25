@@ -69,3 +69,4 @@ tests/gtab/gtab-harness
 tests/gtab/local/
 tests/session/hime-client-test
 tests/session/gtk*-im-test
+tests/session/qt*-im-test

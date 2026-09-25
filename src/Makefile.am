@@ -269,6 +269,8 @@ $(GTK4_IM_TEST): ../tests/session/gtk-im-test.c
 session-test-programs: $(HIME_CLIENT_TEST)
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) $(GTK3_IM_TEST); fi
 	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) $(GTK4_IM_TEST); fi
+	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im qt-im-test; fi
+	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im qt-im-test; fi
 
 hime-tslearn: $(OBJS_TSLEARN) im-client/libhime-im-client.so
 	@echo "linking $@ ..."

@@ -29,6 +29,15 @@ OBJS= moc_hime-qt.o hime-qt.o hime-imcontext-qt.o moc_hime-imcontext-qt.o
 QTLIBS=-lQt6Gui -lQt6DBus -lQt6Core
 LDFLAGS+=$(LDFLAGS_ENV) -L../im-client -lhime-im-client $(QTLIBS)
 
+# Drives the input context as the platform plugin would (tests/session/).
+QT_IM_TEST=../../tests/session/qt6-im-test
+
+$(QT_IM_TEST): ../../tests/session/qt-im-test.cpp
+	$(CXX) -std=c++17 $(CXXFLAGS) -I$(QTINC)/QtGui/$(QTVER)/QtGui -I$(QTINC)/QtCore/$(QTVER)/QtCore -o $@ $< $(QTLIBS)
+
+.PHONY: qt-im-test
+qt-im-test: $(QT_IM_TEST)
+
 .PHONY: all
 all:    qt_info im-hime.so
 
@@ -76,7 +85,7 @@ uninstall:
 .PHONY: clean
 clean:
 	@echo "clean up"
-	@rm -f $(OBJS) im-hime.so *~ core.* *moc*.cpp *.E .depend
+	@rm -f $(OBJS) im-hime.so *~ core.* *moc*.cpp *.E .depend $(QT_IM_TEST)
 	@rm -f moc_hime-qt.cpp moc_hime-imcontext-qt.cpp
 
 .depend:

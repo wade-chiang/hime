@@ -1,0 +1,145 @@
+/*
+ * Copyright (C) 2026 The HIME team, Taiwan
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+
+/*
+ * Types keys into the input context Qt loads for QT_IM_MODULE, the way the
+ * platform plugin hands key events to it, and prints the context in use
+ * and what it commits.  Built against Qt 5 and Qt 6; run it in
+ * run-session.sh to test the HIME module on Wayland or xcb.
+ *
+ * Usage: qt{5,6}-im-test KEY...
+ *   KEY is a single printable character or one of <space> <enter> <bs>
+ *   <esc>.
+ */
+
+#include <stdio.h>
+#include <string.h>
+
+#include <QtGui/QGuiApplication>
+#include <QtGui/QInputMethodEvent>
+#include <QtGui/QKeyEvent>
+#include <QtGui/QWindow>
+#include <QtGui/private/qguiapplication_p.h>
+#include <QtGui/qpa/qplatforminputcontext.h>
+#include <QtGui/qpa/qplatformintegration.h>
+#include <QtGui/qpa/qwindowsysteminterface.h>
+
+// A text field: accepts input methods and collects what they commit.
+class TextWindow : public QWindow {
+  public:
+    QString commits;
+
+  protected:
+    bool event (QEvent *e) override {
+        if (e->type () == QEvent::InputMethodQuery) {
+            QInputMethodQueryEvent *query = static_cast<QInputMethodQueryEvent *> (e);
+            query->setValue (Qt::ImEnabled, true);
+            query->setValue (Qt::ImCursorRectangle, QRect (10, 10, 1, 16));
+            return true;
+        }
+        if (e->type () == QEvent::InputMethod) {
+            commits += static_cast<QInputMethodEvent *> (e)->commitString ();
+            return true;
+        }
+        return QWindow::event (e);
+    }
+};
+
+struct Key {
+    int qt_key;
+    quint32 keysym;
+    QString text;
+};
+
+static bool parse_key (const char *tok, Key *key) {
+    static const struct {
+        const char *name;
+        int qt_key;
+        quint32 keysym;
+        const char *text;
+    } named_keys[] = {
+        {"<space>", Qt::Key_Space, 0x20, " "},
+        {"<enter>", Qt::Key_Return, 0xff0d, "\r"},
+        {"<bs>", Qt::Key_Backspace, 0xff08, "\b"},
+        {"<esc>", Qt::Key_Escape, 0xff1b, "\x1b"},
+    };
+
+    for (size_t i = 0; i < sizeof (named_keys) / sizeof (named_keys[0]); i++) {
+        if (!strcmp (tok, named_keys[i].name)) {
+            *key = {named_keys[i].qt_key, named_keys[i].keysym, QString::fromLatin1 (named_keys[i].text)};
+            return true;
+        }
+    }
+
+    if (strlen (tok) == 1 && tok[0] > ' ' && tok[0] < 127) {
+        // Latin-1 keysyms equal their character codes
+        const QChar c = QLatin1Char (tok[0]);
+        *key = {c.toUpper ().unicode (), (quint32) tok[0], QString (c)};
+        return true;
+    }
+
+    return false;
+}
+
+int main (int argc, char **argv) {
+    QGuiApplication app (argc, argv);
+
+    TextWindow window;
+    window.resize (200, 50);
+    window.show ();
+    // A headless compositor has no keyboard, so the window never gets the
+    // keyboard focus on its own: activate it as the platform plugin would.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QWindowSystemInterface::handleFocusWindowChanged (&window, Qt::ActiveWindowFocusReason);
+#else
+    QWindowSystemInterface::handleWindowActivated (&window, Qt::ActiveWindowFocusReason);
+#endif
+    for (int i = 0; i < 50 && QGuiApplication::focusWindow () != &window; i++)
+        app.processEvents (QEventLoop::AllEvents, 100);
+
+    QPlatformInputContext *context = QGuiApplicationPrivate::platformIntegration ()->inputContext ();
+    if (!context) {
+        fprintf (stderr, "no input context\n");
+        return 1;
+    }
+    context->setFocusObject (&window);
+
+    for (int i = 1; i < argc; i++) {
+        Key key;
+        if (!parse_key (argv[i], &key)) {
+            fprintf (stderr, "bad key: %s\n", argv[i]);
+            return 2;
+        }
+
+        window.commits.clear ();
+        QKeyEvent press (QEvent::KeyPress, key.qt_key, Qt::NoModifier, 0, key.keysym, 0, key.text);
+        const bool eaten = context->filterEvent (&press);
+        QKeyEvent release (QEvent::KeyRelease, key.qt_key, Qt::NoModifier, 0, key.keysym, 0, key.text);
+        context->filterEvent (&release);
+
+        printf ("%-8s %s", argv[i], eaten ? "eat " : "pass");
+        if (!window.commits.isEmpty ())
+            printf (" commit=\"%s\"", window.commits.toUtf8 ().constData ());
+        printf ("\n");
+    }
+
+    printf ("module=%s\n", context->metaObject ()->className ());
+    printf ("platform=%s\n", QGuiApplication::platformName ().toUtf8 ().constData ());
+    printf ("focus=%s\n", QGuiApplication::focusWindow () == &window ? "yes" : "no");
+    return 0;
+}

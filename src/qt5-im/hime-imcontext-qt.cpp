@@ -24,6 +24,14 @@ typedef struct {
 
 static WId focused_win;
 
+// X display and window ids only exist on the xcb platform; on Wayland
+// nativeResourceForWindow ("display") is a wl_display and winId () is not an
+// X window.  Without them the client library reaches the daemon through its
+// socket path alone.
+static bool is_xcb () {
+    return QGuiApplication::platformName () == QLatin1String ("xcb");
+}
+
 #include <QtGui/qpa/qplatformnativeinterface.h>
 
 #if DEBUG
@@ -51,7 +59,7 @@ QHimePlatformInputContext::QHimePlatformInputContext () {
     QPlatformNativeInterface *native = QGuiApplication::platformNativeInterface ();
     if (!native)
         return;
-    Display *display = static_cast<Display *> (native->nativeResourceForWindow ("display", NULL));
+    Display *display = is_xcb () ? static_cast<Display *> (native->nativeResourceForWindow ("display", NULL)) : NULL;
 
     if (!(hime_ch = hime_im_client_open (display))) {
         perror ("cannot open hime_ch");
@@ -157,7 +165,9 @@ void QHimePlatformInputContext::setFocusObject (QObject *object) {
     focused_win = win;
 
     if (hime_ch) {
-        hime_im_client_set_client_window (hime_ch, win);
+        if (is_xcb ()) {
+            hime_im_client_set_client_window (hime_ch, win);
+        }
         hime_im_client_focus_in (hime_ch);
         cursorMoved ();
     }

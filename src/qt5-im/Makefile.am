@@ -23,6 +23,18 @@ OBJS= moc_hime-qt.o hime-qt.o hime-imcontext-qt.o moc_hime-imcontext-qt.o
 QTLIBS=$(shell pkg-config Qt5Core Qt5Gui Qt5DBus --libs)
 LDFLAGS+=$(LDFLAGS_ENV) -L../im-client -lhime-im-client $(QTLIBS)
 
+# Drives the input context as the platform plugin would (tests/session/).
+QT_IM_TEST=../../tests/session/qt5-im-test
+# Qt 5 private headers need qplatformdefs.h from the mkspec
+QT_MKSPEC=$(shell $(QT5_QMAKE_PATH) -query QT_HOST_DATA)/mkspecs/$(shell $(QT5_QMAKE_PATH) -query QMAKE_XSPEC)
+
+$(QT_IM_TEST): ../../tests/session/qt-im-test.cpp
+	$(CXX) -std=c++17 $(CXXFLAGS) -I$(QTINC)/QtGui/$(QTVER)/QtGui -I$(QTINC)/QtCore/$(QTVER)/QtCore \
+		-I$(QT_MKSPEC) -o $@ $< $(QTLIBS)
+
+.PHONY: qt-im-test
+qt-im-test: $(QT_IM_TEST)
+
 .PHONY: all
 all:    qt_info im-hime.so
 
@@ -70,7 +82,7 @@ uninstall:
 .PHONY: clean
 clean:
 	@echo "clean up"
-	@rm -f $(OBJS) im-hime.so *~ core.* *moc*.cpp *.E .depend
+	@rm -f $(OBJS) im-hime.so *~ core.* *moc*.cpp *.E .depend $(QT_IM_TEST)
 	@rm -f moc_hime-qt.cpp moc_hime-imcontext-qt.cpp
 
 .depend:

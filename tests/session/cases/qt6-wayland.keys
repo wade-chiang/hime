@@ -1,0 +1,4 @@
+@program qt6-im-test
+# A native Wayland Qt 6 application typing through the HIME IM module.
+b 1 a <space> c 2 x <space>
+b c <bs> <space> , <space>
