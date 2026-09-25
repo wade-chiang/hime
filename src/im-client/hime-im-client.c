@@ -147,8 +147,14 @@ static HIME_client_handle *hime_im_client_reopen (HIME_client_handle *hime_ch,
 
     init_is_special_user ();
 
+    // declared before the first goto so that every path reaching next:
+    // sees initialized values
+    int sockfd = 0;
+    int ipv4 = FALSE;
+    Server_IP_port srv_ip_port;
+
     if (!display) {
-        dbg ("display is null fd: %d\n", hime_ch->fd);
+        dbg ("display is null\n");
         goto next;
     }
 
@@ -199,9 +205,6 @@ static HIME_client_handle *hime_im_client_reopen (HIME_client_handle *hime_ch,
     // (if failed,) we try to create a IPv4 socket (ipv4 flag will be set).
     // -----------------------------------------------------------------------
 
-    int sockfd = 0;
-    int ipv4 = FALSE;
-
     // -----------------------------------------------------------------------
     // trying to create a UNIX domain socket (AF_UNIX) connection
     // -----------------------------------------------------------------------
@@ -250,7 +253,6 @@ tcp:;
         goto next;
     }
 
-    Server_IP_port srv_ip_port;
     memcpy (&srv_ip_port, ipv4_message_sock, sizeof (srv_ip_port));
     XFree (ipv4_message_sock);
     ipv4_message_sock = NULL;
