@@ -1,0 +1,166 @@
+/*
+ * Copyright (C) 2026 The HIME team, Taiwan
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+
+/*
+ * Types keys into the IM module GTK picks (GTK_IM_MODULE), the way a text
+ * widget would, and prints the module in use and what it commits.  Built
+ * against GTK 3 and GTK 4; run it in run-session.sh to test the HIME
+ * module on a native Wayland display.
+ *
+ * Usage: gtk{3,4}-im-test KEY...
+ *   KEY is a single printable character or one of <space> <enter> <bs>
+ *   <esc>.
+ */
+
+#include <stdio.h>
+#include <string.h>
+
+#include <gtk/gtk.h>
+
+static GString *commits;
+
+static void on_commit (GtkIMContext *context, const char *str, gpointer data) {
+    g_string_append (commits, str);
+}
+
+static guint parse_key (const char *tok) {
+    static const struct {
+        const char *name;
+        guint keyval;
+    } named_keys[] = {
+        {"<space>", GDK_KEY_space},
+        {"<enter>", GDK_KEY_Return},
+        {"<bs>", GDK_KEY_BackSpace},
+        {"<esc>", GDK_KEY_Escape},
+    };
+
+    size_t i;
+    for (i = 0; i < G_N_ELEMENTS (named_keys); i++)
+        if (!strcmp (tok, named_keys[i].name))
+            return named_keys[i].keyval;
+
+    if (strlen (tok) == 1 && tok[0] > ' ' && tok[0] < 127)
+        return gdk_unicode_to_keyval (tok[0]);
+
+    return GDK_KEY_VoidSymbol;
+}
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+
+static GtkWidget *window, *text;
+
+static void setup (GtkIMContext *context) {
+    window = gtk_window_new ();
+    text = gtk_text_new ();
+    gtk_window_set_child (GTK_WINDOW (window), text);
+    gtk_widget_realize (window);
+    gtk_im_context_set_client_widget (context, text);
+}
+
+static gboolean send_key (GtkIMContext *context, guint keyval, gboolean press) {
+    GdkDisplay *display = gtk_widget_get_display (window);
+    GdkKeymapKey *keys = NULL;
+    int n_keys = 0;
+    guint keycode = 0, group = 0;
+    if (gdk_display_map_keyval (display, keyval, &keys, &n_keys) && n_keys) {
+        keycode = keys[0].keycode;
+        group = keys[0].group;
+    }
+    g_free (keys);
+
+    GdkDevice *keyboard = gdk_seat_get_keyboard (gdk_display_get_default_seat (display));
+    GdkSurface *surface = gtk_native_get_surface (GTK_NATIVE (window));
+
+    return gtk_im_context_filter_key (context, press, surface, keyboard,
+                                      GDK_CURRENT_TIME, keycode, 0, group);
+}
+
+#else
+
+static GtkWidget *window;
+
+static void setup (GtkIMContext *context) {
+    window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    gtk_widget_realize (window);
+    gtk_im_context_set_client_window (context, gtk_widget_get_window (window));
+}
+
+static gboolean send_key (GtkIMContext *context, guint keyval, gboolean press) {
+    GdkWindow *gdk_window = gtk_widget_get_window (window);
+    GdkEvent *event = gdk_event_new (press ? GDK_KEY_PRESS : GDK_KEY_RELEASE);
+    event->key.window = g_object_ref (gdk_window);
+    event->key.time = GDK_CURRENT_TIME;
+    event->key.keyval = keyval;
+
+    GdkKeymapKey *keys = NULL;
+    int n_keys = 0;
+    GdkKeymap *keymap = gdk_keymap_get_for_display (gdk_window_get_display (gdk_window));
+    if (gdk_keymap_get_entries_for_keyval (keymap, keyval, &keys, &n_keys) && n_keys) {
+        event->key.hardware_keycode = keys[0].keycode;
+        event->key.group = keys[0].group;
+    }
+    g_free (keys);
+
+    GdkSeat *seat = gdk_display_get_default_seat (gdk_window_get_display (gdk_window));
+    gdk_event_set_device (event, gdk_seat_get_keyboard (seat));
+
+    const gboolean eaten = gtk_im_context_filter_keypress (context, &event->key);
+    gdk_event_free (event);
+    return eaten;
+}
+
+#endif
+
+int main (int argc, char **argv) {
+#if GTK_CHECK_VERSION(4, 0, 0)
+    gtk_init ();
+#else
+    gtk_init (&argc, &argv);
+#endif
+
+    commits = g_string_new (NULL);
+
+    GtkIMContext *context = gtk_im_multicontext_new ();
+    g_signal_connect (context, "commit", G_CALLBACK (on_commit), NULL);
+    setup (context);
+    gtk_im_context_focus_in (context);
+
+    int i;
+    for (i = 1; i < argc; i++) {
+        guint keyval = parse_key (argv[i]);
+        if (keyval == GDK_KEY_VoidSymbol) {
+            fprintf (stderr, "bad key: %s\n", argv[i]);
+            return 2;
+        }
+
+        g_string_truncate (commits, 0);
+        const gboolean eaten = send_key (context, keyval, TRUE);
+        send_key (context, keyval, FALSE);
+
+        printf ("%-8s %s", argv[i], eaten ? "eat " : "pass");
+        if (commits->len)
+            printf (" commit=\"%s\"", commits->str);
+        printf ("\n");
+    }
+
+    printf ("module=%s\n", gtk_im_multicontext_get_context_id (GTK_IM_MULTICONTEXT (context)));
+    printf ("backend=%s\n", G_OBJECT_TYPE_NAME (gdk_display_get_default ()));
+
+    gtk_im_context_focus_out (context);
+    return 0;
+}

@@ -11,6 +11,10 @@
 # Xwayland.  Requires mutter and dbus-run-session.
 #
 # The daemon's config can be adjusted with HIME_CONF="name=value ..."
+#
+# GTK and Qt applications pick up the HIME IM modules from the build tree.
+# With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
+# Xwayland instead.
 
 set -euo pipefail
 
@@ -97,4 +101,15 @@ fi
 export WAYLAND_DISPLAY=wl-hime-test
 export LD_LIBRARY_PATH="$top/src/im-client${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export HIME_IM_CLIENT_NO_AUTO_EXEC=1
+
+export GTK_IM_MODULE=hime
+if [[ -f "$top/src/gtk3-im/im-hime.so" ]]; then
+    gtk-query-immodules-3.0 "$top/src/gtk3-im/im-hime.so" >"$tmp/immodules.cache"
+    export GTK_IM_MODULE_FILE="$tmp/immodules.cache"
+fi
+
+if [[ "${HIME_SESSION_X11:-}" == 1 ]]; then
+    export DISPLAY="$x_display" XAUTHORITY="$x_auth" GDK_BACKEND=x11
+fi
+
 "$@"

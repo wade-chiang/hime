@@ -1,0 +1,5 @@
+@program gtk3-im-test
+@x11
+# A GTK 3 application on X11 (Xwayland) typing through the HIME IM module.
+b 1 a <space> c 2 x <space>
+b c <bs> <space> , <space>

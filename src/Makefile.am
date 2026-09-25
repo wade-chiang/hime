@@ -253,6 +253,16 @@ $(HIME_CLIENT_TEST): ../tests/session/hime-client-test.c im-client/libhime-im-cl
 .PHONY: hime-client-test
 hime-client-test: $(HIME_CLIENT_TEST)
 
+# Drives the GTK IM module as a text widget would (tests/session/).
+GTK3_IM_TEST = ../tests/session/gtk3-im-test
+
+$(GTK3_IM_TEST): ../tests/session/gtk-im-test.c
+	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk+-3.0`
+
+.PHONY: session-test-programs
+session-test-programs: $(HIME_CLIENT_TEST)
+	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) $(GTK3_IM_TEST); fi
+
 hime-tslearn: $(OBJS_TSLEARN) im-client/libhime-im-client.so
 	@echo "linking $@ ..."
 	$(CCLD) $(gcc_ld_run_path) -o $@ $^ -L./im-client -lhime-im-client \
@@ -392,5 +402,6 @@ clean:
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im clean; fi
 	@rm -f *.o *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
-		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST)
+		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
+		$(GTK3_IM_TEST)
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;

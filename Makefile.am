@@ -41,7 +41,7 @@ check:
 
 .PHONY: check-session
 check-session:
-	$(MAKE) -C src hime hime-cin2gtab hime-client-test
+	$(MAKE) -C src all hime-cin2gtab session-test-programs
 	./tests/session/run-tests.sh
 
 .PHONY: clang-format

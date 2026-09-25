@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 #
-# Session tests: each cases/NAME.keys is typed by hime-client-test inside a
-# headless mutter session (run-session.sh); the output must match
-# cases/NAME.expected.  Lines starting with # are comments.
+# Session tests: each cases/NAME.keys is typed inside a headless mutter
+# session (run-session.sh); the output must match cases/NAME.expected.
+# Lines starting with # are comments.  Directives:
+#
+#   @program NAME   the client typing the keys (default hime-client-test,
+#                   a client without an X display; gtk3-im-test goes
+#                   through the GTK 3 IM module)
+#   @x11            run the client on Xwayland instead of Wayland
 #
 # Usage: run-tests.sh [--update]
 # Exits 77 (skipped) when mutter is not available.
@@ -27,9 +32,18 @@ fail=0
 for keys in "$here"/cases/*.keys; do
     name="$(basename "$keys" .keys)"
     expected="${keys%.keys}.expected"
-    read -ra args <<<"$(grep -v "^#" "$keys" | tr "\n" " ")"
+    read -ra args <<<"$(grep -v -e "^#" -e "^@" "$keys" | tr "\n" " ")"
 
-    if ! "$here/run-session.sh" "$here/hime-client-test" "${args[@]}" \
+    program=hime-client-test
+    x11=""
+    while read -r directive arg; do
+        case "$directive" in
+        @program) program="$arg" ;;
+        @x11) x11=1 ;;
+        esac
+    done < <(grep '^@' "$keys")
+
+    if ! HIME_SESSION_X11="$x11" "$here/run-session.sh" "$here/$program" "${args[@]}" \
         >"$tmp/$name.actual" 2>"$tmp/$name.stderr"; then
         echo "FAIL $name"
         grep -v -e dbus-daemon -e "connection to the bus" "$tmp/$name.stderr" || true

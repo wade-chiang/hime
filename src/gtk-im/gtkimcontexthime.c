@@ -47,6 +47,8 @@ struct _GtkIMContextHIME {
 
 static const int BUFFER_SIZE = 256;
 
+static GObjectClass *parent_class;
+
 // GObject functions
 static void gtk_im_context_hime_class_init (GtkIMContextHIMEClass *class);
 static void gtk_im_context_hime_init (GtkIMContextHIME *im_context_hime);
@@ -115,6 +117,8 @@ static void gtk_im_context_hime_class_init (GtkIMContextHIMEClass *class) {
     GtkIMContextClass *im_context_class = GTK_IM_CONTEXT_CLASS (class);
     GObjectClass *gobject_class = G_OBJECT_CLASS (class);
 
+    parent_class = g_type_class_peek_parent (class);
+
     im_context_class->set_client_window = gtk_im_context_hime_set_client_window;
     im_context_class->get_preedit_string = gtk_im_context_hime_get_preedit_string;
     im_context_class->filter_keypress = gtk_im_context_hime_filter_keypress;
@@ -178,6 +182,19 @@ static void gtk_im_context_hime_finalize (GObject *obj) {
     }
 
     context_xim->client_window = NULL;
+
+    parent_class->finalize (obj);
+}
+
+// The X display, or NULL on other GDK backends (Wayland): the client
+// library then reaches the daemon through its socket path alone.
+static Display *get_x_display (GdkDisplay *display) {
+#if GTK_CHECK_VERSION(3, 0, 0)
+    if (!GDK_IS_X11_DISPLAY (display)) {
+        return NULL;
+    }
+#endif
+    return GDK_DISPLAY_XDISPLAY (display);
 }
 
 static void get_hime_im_client (GtkIMContextHIME *context_xim) {
@@ -192,8 +209,7 @@ static void get_hime_im_client (GtkIMContextHIME *context_xim) {
     }
 
     if (!context_xim->hime_ch) {
-        context_xim->hime_ch = hime_im_client_open (
-            GDK_DISPLAY_XDISPLAY (display));
+        context_xim->hime_ch = hime_im_client_open (get_x_display (display));
         if (!context_xim->hime_ch) {
             perror ("cannot open hime_ch");
         }
@@ -213,6 +229,14 @@ static void gtk_im_context_hime_set_client_window (GtkIMContext *context,
     context_xim->client_window = client_window;
 
     get_hime_im_client (context_xim);
+
+#if GTK_CHECK_VERSION(3, 0, 0)
+    // only an X window lets the daemon place its window at the cursor
+    if (!GDK_IS_X11_WINDOW (client_window)) {
+        return;
+    }
+#endif
+
     if (context_xim->hime_ch) {
         hime_im_client_set_client_window (context_xim->hime_ch,
                                           GDK_WINDOW_XID (client_window));
@@ -259,44 +283,12 @@ static void gtk_im_context_hime_get_preedit_string (
     }
 }
 
-// returns 0 if failed
-static int construct_xevent (const GdkEventKey *event,
-                             XKeyPressedEvent *xevent) {
-
-    GdkScreen *screen = gdk_window_get_screen (event->window);
-    if (!screen) {
-        return 0;
-    }
-
-    GdkWindow *root_window = gdk_screen_get_root_window (screen);
-
-    xevent->type = (event->type == GDK_KEY_PRESS) ? KeyPress : KeyRelease;
-    xevent->serial = 0;
-    xevent->send_event = (unsigned char) event->send_event;
-    xevent->display = GDK_WINDOW_XDISPLAY (event->window);
-    xevent->window = GDK_WINDOW_XID (event->window);
-    xevent->root = GDK_WINDOW_XID (root_window);
-    xevent->subwindow = xevent->window;
-    xevent->time = event->time;
-    xevent->x = 0;
-    xevent->y = 0;
-    xevent->x_root = 0;
-    xevent->y_root = 0;
-    xevent->state = event->state;
-    xevent->keycode = event->hardware_keycode;
-    xevent->same_screen = True;
-
-    return 1;
-}
-
 static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
                                                      GdkEventKey *event) {
     GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (context);
 
-    // buffer between X and hime
-    gchar static_buffer[BUFFER_SIZE];
-    char *buffer = static_buffer;
-    gint buffer_size = sizeof (static_buffer) - 1;
+    // text of the key, committed as is when hime does not take the key
+    gchar buffer[BUFFER_SIZE];
 
     // TRUE if the input method handled the key event.
     // No further processing should be done for this key event for Gtk.
@@ -305,28 +297,18 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
     // the final result of preediting to be commited
     char *result_str = NULL;
 
-    // construct key event
-    XKeyPressedEvent xevent;
-    int ok = construct_xevent (event, &xevent);
-    if (!ok) {
-        // can't get root window, skip processing
-        return result;
-    }
+    // GDK key values are X keysyms, already translated for the modifier
+    // state; hime works with those on every backend.
+    const KeySym keysym = event->keyval;
 
-    // XLookupString translates a key event to a KeySym and a string,
-    // returns the number of characters that are stored in the buffer.
-    KeySym keysym = 0;
-    gsize num_bytes = XLookupString (&xevent, buffer, buffer_size, &keysym, NULL);
-
-#if (!FREEBSD)
     // Convert from a GDK key symbol to the corresponding ISO10646 (Unicode) character.
     // returns 0 if there is no corresponding character.
+    gsize num_bytes = 0;
     const guint32 unicode = gdk_keyval_to_unicode (event->keyval);
     if (unicode) {
         num_bytes = g_unichar_to_utf8 (unicode, buffer);
-        buffer[num_bytes] = '\0';
     }
-#endif
+    buffer[num_bytes] = '\0';
 
     // tell hime-im-client to process key event
     // result_str would hold the result
@@ -397,7 +379,7 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
         context_xim->pe_cursor = cursor_pos;
     }
 
-    const gboolean alt_or_control_pressed = event->state & (Mod1Mask | ControlMask);
+    const gboolean alt_or_control_pressed = event->state & (GDK_MOD1_MASK | GDK_CONTROL_MASK);
     // GDK_KEY_PRESS event
     // hime_im_client_forward_key_press returns False
     // result_str is empty

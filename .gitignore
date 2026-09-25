@@ -68,3 +68,4 @@ missing
 tests/gtab/gtab-harness
 tests/gtab/local/
 tests/session/hime-client-test
+tests/session/gtk*-im-test
