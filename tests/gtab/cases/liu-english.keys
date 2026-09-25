@@ -1,0 +1,9 @@
+@table test-liu.gtab
+# tap shift to switch to English and back
+<shift> a b <space> <shift> a <space>
+# shifted letters while in Chinese mode
+S-a S-b <space>
+# shift tapped with input pending
+b <shift> <space>
+# ctrl-space turns the input method off and on again
+C-<space> a C-<space> a <space>

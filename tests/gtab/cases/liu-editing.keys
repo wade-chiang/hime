@@ -1,0 +1,20 @@
+@table test-liu.gtab
+# backspace removes the last key
+b c <bs> <space>
+# backspace on empty input passes through
+<bs>
+# escape clears the input
+b c <esc>
+# codes with no match
+z z <space>
+x <space>
+# start a new code without committing the previous one
+a b <space>
+c d <space>
+d d <space>
+# enter with pending input
+b <enter>
+# a selection key with no candidate shown
+b 5
+# typing past the longest code
+b c d e f <space>

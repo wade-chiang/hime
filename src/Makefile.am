@@ -224,6 +224,21 @@ else
 endif
 	@rm -f core.* vgcore.*
 
+# Characterization test harness for the gtab engine (tests/gtab/).  It
+# links the daemon objects except the X11 main program and the gtab
+# window, which harness.c replaces with recorders.
+GTAB_HARNESS = ../tests/gtab/gtab-harness
+GTAB_HARNESS_OBJS = $(filter-out hime.o win-gtab.o,$(OBJS))
+
+../tests/gtab/harness.o: ../tests/gtab/harness.c
+	$(CC) $(CFLAGS) -I. -c -o $@ $<
+
+$(GTAB_HARNESS): ../tests/gtab/harness.o $(GTAB_HARNESS_OBJS) $(IMdkitLIB) $(OBJ_IMSRV)
+	$(CCLD) -o $@ $^ -Wl,--wrap=bell -lXtst $(LDFLAGS)
+
+.PHONY: gtab-harness
+gtab-harness: $(GTAB_HARNESS)
+
 hime-tslearn: $(OBJS_TSLEARN) im-client/libhime-im-client.so
 	@echo "linking $@ ..."
 	$(CCLD) $(gcc_ld_run_path) -o $@ $^ -L./im-client -lhime-im-client \
@@ -362,5 +377,6 @@ clean:
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im clean; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im clean; fi
 	@rm -f *.o *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
-		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec
+		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
+		$(GTAB_HARNESS) ../tests/gtab/harness.o
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;

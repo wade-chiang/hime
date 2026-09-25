@@ -1,0 +1,19 @@
+@table test-liu.gtab
+# unique code, space commits it
+a <space>
+# two candidates: space takes the first, selkey 1 the second
+b <space>
+b 1
+# three candidates
+c <space>
+c 1
+c 2
+# prefix codes of increasing length
+b c <space>
+b c d <space>
+b c d e <space>
+# phrase entry
+e a <space>
+# punctuation codes
+, <space>
+. <space>

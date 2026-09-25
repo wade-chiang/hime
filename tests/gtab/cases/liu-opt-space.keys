@@ -1,0 +1,7 @@
+@table test-liu.gtab
+@conf gtab-space-auto-first 4
+# space_style overridden to "does not send first character"
+a <space>
+b <space> <space>
+b <space> 1
+c <space> 2

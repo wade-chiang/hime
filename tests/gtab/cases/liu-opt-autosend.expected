@@ -1,0 +1,11 @@
+# a unique code is sent without space
+a        eat  in="" sel="" commit="一"
+d        eat  in="D" sel="天 "
+# full-length code
+b        eat  in="D" sel="天 "
+c        eat  in="D" sel="天 "
+d        eat  in="" sel="" commit="地"
+e        eat  in="E" sel="人 1入 2大 3太 "
+# still ambiguous
+b        eat  in="E" sel="人 1入 2大 3太 "
+<space>  eat  in="" sel="" commit="人"

@@ -1,0 +1,10 @@
+@table test-liu.gtab
+# thirteen candidates: space still commits the first one
+p <space>
+# page keys
+p <pgdn> <pgup> 3
+# select from the second page
+p <pgdn> 1
+p <pgdn> <space>
+# paging past the last page
+p <pgdn> <pgdn> <esc>

@@ -1,0 +1,20 @@
+# thirteen candidates: space still commits the first one
+p        eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+<space>  eat  in="" sel="" commit="甲"
+# page keys
+p        eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+<pgdn>   eat  in="P" sel="丑 1寅 " page="2/2"
+<pgup>   eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+3        eat  in="" sel="" commit="丁"
+# select from the second page
+p        eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+<pgdn>   eat  in="P" sel="丑 1寅 " page="2/2"
+1        eat  in="" sel="" commit="寅"
+p        eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+<pgdn>   eat  in="P" sel="丑 1寅 " page="2/2"
+<space>  eat  in="" sel="" commit="丑"
+# paging past the last page
+p        eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+<pgdn>   eat  in="P" sel="丑 1寅 " page="2/2"
+<pgdn>   eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+<esc>    eat  in="" sel=""

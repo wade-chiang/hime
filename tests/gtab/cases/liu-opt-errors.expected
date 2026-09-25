@@ -1,0 +1,14 @@
+# invalid key kept in the input area
+z        eat  in="Z" sel=""
+z        eat  in="ZZ" sel=""
+<space>  eat  in="ZZ" sel="" bell=1
+<esc>    eat  in="" sel=""
+x        eat  in="X" sel=""
+<space>  eat  in="X" sel="" bell=1
+<bs>     eat  in="" sel=""
+<bs>     pass in="" sel=""
+# in space_style 1 the first candidate is sent, so no bell rings
+b        eat  in="B" sel="二 1八 "
+<space>  eat  in="" sel="" commit="二"
+p        eat  in="P" sel="甲 1乙 2丙 3丁 4戊 5己 6庚 7辛 8壬 9癸 0子 " page="1/2"
+<space>  eat  in="" sel="" commit="甲"

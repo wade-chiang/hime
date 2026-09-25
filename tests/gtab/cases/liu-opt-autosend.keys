@@ -1,0 +1,10 @@
+@table test-liu.gtab
+@conf gtab-unique-auto-send 1
+@conf gtab-press-full-auto-send 1
+# a unique code is sent without space
+a
+d
+# full-length code
+b c d e
+# still ambiguous
+b <space>

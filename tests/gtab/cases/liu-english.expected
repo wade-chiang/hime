@@ -1,0 +1,22 @@
+# tap shift to switch to English and back
+<shift>  eat  in="" sel="" eat-release
+a        eat  in="" sel="" commit="a"
+b        eat  in="" sel="" commit="b"
+<space>  eat  in="" sel="" commit=" "
+<shift>  eat  in="" sel="" eat-release
+a        eat  in="A" sel="一 "
+<space>  eat  in="" sel="" commit="一"
+# shifted letters while in Chinese mode
+S-a      eat  in="" sel="" commit="A"
+S-b      eat  in="" sel="" commit="B"
+<space>  pass in="" sel=""
+# shift tapped with input pending
+b        eat  in="B" sel="二 1八 "
+<shift>  eat  in="" sel="二 1八 " eat-release
+<space>  eat  in="" sel="二 1八 " commit=" "
+# ctrl-space turns the input method off and on again
+C-<space> eat  in="" sel="" hidden
+a        pass in="" sel="" hidden
+C-<space> eat  in="" sel=""
+a        eat  in="A" sel="一 "
+<space>  eat  in="" sel="" commit="一"

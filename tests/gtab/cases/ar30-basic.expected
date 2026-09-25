@@ -1,0 +1,10 @@
+# array30 uses space_style 4
+a        eat  in="1-" sel="1一 2到 3聽 4現 5政 6弄 7兩 8而 9面 0要 "
+<space>  eat  in="" sel="" commit="一"
+a        eat  in="1-" sel="1一 2到 3聽 4現 5政 6弄 7兩 8而 9面 0要 "
+<space>  eat  in="" sel="" commit="一"
+2        eat  in="" sel="" commit="2"
+f        eat  in="4-" sel="1十 2莊 3落 4著 5華 6萬 7真 8花 9敬 0故 "
+a        eat  in="4-1-" sel="1直 2莖 3茸 4華 5萋 7葬 0蕈 "
+<space>  eat  in="" sel="" commit="直"
+1        eat  in="" sel="" commit="1"

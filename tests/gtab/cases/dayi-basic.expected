@@ -1,0 +1,8 @@
+d        eat  in="日" sel="日 '曰 "
+a        eat  in="日人" sel="歇 "
+<space>  eat  in="" sel="" commit="歇"
+d        eat  in="日" sel="日 '曰 "
+<space>  eat  in="" sel="" commit="日"
+d        eat  in="日" sel="日 '曰 "
+1        eat  in="日言" sel="申 '甲 "
+<space>  eat  in="" sel="" commit="申"

@@ -64,3 +64,6 @@ install-sh
 missing
 *Makefile
 *Makefile.in
+# gtab characterization tests
+tests/gtab/gtab-harness
+tests/gtab/local/

@@ -1,0 +1,6 @@
+@table dayi3.gtab
+@conf gtab-auto-select-by_phrase 1
+@phrase-db
+# phrase buffer mode: characters collect until enter
+d a <space> d <space> <enter>
+d a <space> <bs> <esc>

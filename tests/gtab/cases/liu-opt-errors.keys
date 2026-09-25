@@ -1,0 +1,9 @@
+@table test-liu.gtab
+@conf gtab-invalid-key-in 1
+@conf gtab-dup-select-bell 1
+# invalid key kept in the input area
+z z <space> <esc>
+x <space> <bs> <bs>
+# in space_style 1 the first candidate is sent, so no bell rings
+b <space>
+p <space>

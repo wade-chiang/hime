@@ -1,0 +1,5 @@
+@table ar30.gtab
+# array30 uses space_style 4
+a <space>
+a <space> 2
+f a <space> 1

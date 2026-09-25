@@ -1,0 +1,5 @@
+@table dayi3.gtab
+@conf gtab-auto-select-by_phrase 2
+d a <space>
+d <space>
+d 1 <space>

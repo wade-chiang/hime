@@ -1,0 +1,37 @@
+# unique code, space commits it
+a        eat  in="A" sel="一 "
+<space>  eat  in="" sel="" commit="一"
+# two candidates: space takes the first, selkey 1 the second
+b        eat  in="B" sel="二 1八 "
+<space>  eat  in="" sel="" commit="二"
+b        eat  in="B" sel="二 1八 "
+1        eat  in="" sel="" commit="八"
+# three candidates
+c        eat  in="C" sel="上 1下 2中 "
+<space>  eat  in="" sel="" commit="上"
+c        eat  in="C" sel="上 1下 2中 "
+1        eat  in="" sel="" commit="下"
+c        eat  in="C" sel="上 1下 2中 "
+2        eat  in="" sel="" commit="中"
+# prefix codes of increasing length
+b        eat  in="B" sel="二 1八 "
+c        eat  in="BC" sel="三 "
+<space>  eat  in="" sel="" commit="三"
+b        eat  in="B" sel="二 1八 "
+c        eat  in="BC" sel="三 "
+d        eat  in="BCD" sel="四 "
+<space>  eat  in="" sel="" commit="四"
+b        eat  in="B" sel="二 1八 "
+c        eat  in="BC" sel="三 "
+d        eat  in="BCD" sel="四 "
+e        eat  in="BCDE" sel="五 "
+<space>  eat  in="" sel="" commit="五"
+# phrase entry
+e        eat  in="E" sel="人 1入 2大 3太 "
+a        eat  in="EA" sel="我們 "
+<space>  eat  in="" sel="" commit="我們"
+# punctuation codes
+,        eat  in="," sel="， "
+<space>  eat  in="" sel="" commit="，"
+.        eat  in="." sel="。 "
+<space>  eat  in="" sel="" commit="。"

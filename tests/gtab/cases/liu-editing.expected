@@ -1,0 +1,40 @@
+# backspace removes the last key
+b        eat  in="B" sel="二 1八 "
+c        eat  in="BC" sel="三 "
+<bs>     eat  in="B" sel="二 1八 "
+<space>  eat  in="" sel="" commit="二"
+# backspace on empty input passes through
+<bs>     pass in="" sel=""
+# escape clears the input
+b        eat  in="B" sel="二 1八 "
+c        eat  in="BC" sel="三 "
+<esc>    eat  in="" sel=""
+# codes with no match
+z        eat  in="" sel=""
+z        eat  in="" sel=""
+<space>  pass in="" sel=""
+x        eat  in="" sel=""
+<space>  pass in="" sel=""
+# start a new code without committing the previous one
+a        eat  in="A" sel="一 "
+b        eat  in="A" sel="一 "
+<space>  eat  in="" sel="" commit="一"
+c        eat  in="C" sel="上 1下 2中 "
+d        eat  in="C" sel="上 1下 2中 "
+<space>  eat  in="" sel="" commit="上"
+d        eat  in="D" sel="天 "
+d        eat  in="DD" sel="地 "
+<space>  eat  in="" sel="" commit="地"
+# enter with pending input
+b        eat  in="B" sel="二 1八 "
+<enter>  pass in="B" sel="二 1八 "
+# a selection key with no candidate shown
+b        eat  in="B" sel="二 1八 "
+5        eat  in="" sel="二 1八 "
+# typing past the longest code
+b        eat  in="B" sel="二 1八 "
+c        eat  in="BC" sel="三 "
+d        eat  in="BCD" sel="四 "
+e        eat  in="BCDE" sel="五 "
+f        eat  in="F" sel="山 " commit="五"
+<space>  eat  in="" sel="" commit="山"
