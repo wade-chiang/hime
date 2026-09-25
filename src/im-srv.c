@@ -150,6 +150,31 @@ static gboolean is_sock_path_in_use (const struct sockaddr_un *serv_addr) {
     return in_use;
 }
 
+// Point the session's default socket, used by clients without DISPLAY, at
+// ours unless another live daemon already owns it.
+static void link_default_sock_path (const char *sock_path) {
+    char default_path[UNIX_PATH_MAX];
+    get_hime_im_srv_default_sock_path (default_path, sizeof (default_path));
+    if (!default_path[0] || !strcmp (default_path, sock_path)) {
+        return;
+    }
+
+    struct sockaddr_un default_addr;
+    init_unix_socket (&default_addr, default_path);
+    if (is_sock_path_in_use (&default_addr)) {
+        return;
+    }
+
+    // relative, so the link stays valid whatever the directory is called
+    const char *target = strrchr (sock_path, '/');
+    target = target ? target + 1 : sock_path;
+
+    unlink (default_path);
+    if (symlink (target, default_path) < 0) {
+        perror ("cannot link the default hime socket");
+    }
+}
+
 static void unlink_serv_addr_sock_path (const struct sockaddr_un *serv_addr) {
     // unlink (remove) the old socket path if exists
 
@@ -227,6 +252,8 @@ static void setup_unix_domain_socket (void) {
     }
 
     dbg ("im_sockfd:%d\n", im_sockfd);
+
+    link_default_sock_path (sock_path);
 
     g_io_add_watch (g_io_channel_unix_new (im_sockfd),
                     G_IO_IN,

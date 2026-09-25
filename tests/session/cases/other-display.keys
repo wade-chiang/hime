@@ -1,0 +1,5 @@
+@env DISPLAY=:9
+@exit 1
+# A client on another X display (:9) must not reach the daemon of :1: each
+# X display has its own daemon, whose windows appear on that display.
+a

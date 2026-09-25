@@ -11,6 +11,7 @@
 #   @x11            run the client on Xwayland instead of Wayland
 #   @tool NAME      run src/NAME (a hime tool, as a Wayland client) first
 #   @exit N         the client's expected exit status (default 0)
+#   @env VAR=VALUE  set an environment variable for the client
 #
 # Usage: run-tests.sh [--update]
 # Exits 77 (skipped) when mutter is not available.
@@ -42,18 +43,23 @@ for keys in "$here"/cases/*.keys; do
     x11=""
     tool=""
     exit_status=0
+    envs=()
     while read -r directive arg; do
         case "$directive" in
         @program) program="$arg" ;;
         @x11) x11=1 ;;
         @tool) tool="$arg" ;;
         @exit) exit_status="$arg" ;;
+        @env) envs+=("$arg") ;;
         esac
     done < <(grep '^@' "$keys")
 
     cmd=("$here/$program" "${args[@]}")
     if [[ -n "$tool" ]]; then
         cmd=(sh -c '"$0" && exec "$@"' "$top/src/$tool" "${cmd[@]}")
+    fi
+    if [[ ${#envs[@]} -gt 0 ]]; then
+        cmd=(env "${envs[@]}" "${cmd[@]}")
     fi
 
     if [[ ! -x "$here/$program" ]]; then

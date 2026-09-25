@@ -27,6 +27,7 @@
 
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <fcntl.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 
@@ -86,6 +87,17 @@ static unsigned char *get_window_property (Display *display,
     return prop_return;
 }
 
+static unsigned char *get_sockpath_atom (Display *display, Window hime_win) {
+
+    Atom hime_sockpath_atom = get_hime_sockpath_atom (display);
+
+    if (!hime_sockpath_atom) {
+        return NULL;
+    }
+
+    return get_window_property (display, hime_win, hime_sockpath_atom);
+}
+
 static unsigned char *get_addr_atom (Display *display, Window hime_win) {
 
     Atom hime_addr_atom = get_hime_addr_atom (display);
@@ -97,10 +109,8 @@ static unsigned char *get_addr_atom (Display *display, Window hime_win) {
     return get_window_property (display, hime_win, hime_addr_atom);
 }
 
-// connect to the daemon's UNIX socket at its well-known path; 0 on failure
-static int connect_unix_socket (void) {
-    char sock_path[UNIX_PATH_MAX];
-    get_hime_im_srv_sock_path (sock_path, sizeof (sock_path));
+// connect to a UNIX socket; 0 on failure
+static int connect_unix_socket (const char *sock_path) {
     if (!sock_path[0]) {
         return 0;
     }
@@ -125,6 +135,29 @@ static int connect_unix_socket (void) {
     return sockfd;
 }
 
+// the daemon's socket at its well-known path, see get_hime_im_srv_sock_path
+static int connect_well_known_socket (void) {
+    char sock_path[UNIX_PATH_MAX];
+    get_hime_im_srv_sock_path (sock_path, sizeof (sock_path));
+    return connect_unix_socket (sock_path);
+}
+
+// the socket published in a property of the daemon's X window, which also
+// finds daemons using another runtime directory or an older path scheme
+static int connect_published_socket (Display *display, Window hime_win) {
+    unsigned char *prop = get_sockpath_atom (display, hime_win);
+    if (!prop) {
+        return 0;
+    }
+
+    Server_sock_path srv_sock_path;
+    memcpy (&srv_sock_path, prop, sizeof (srv_sock_path));
+    XFree (prop);
+    srv_sock_path.sock_path[sizeof (srv_sock_path.sock_path) - 1] = '\0';
+
+    return connect_unix_socket (srv_sock_path.sock_path);
+}
+
 // start the daemon, at most once every few seconds; TRUE if it was started
 // and survived until it daemonized
 static gboolean start_hime_server (void) {
@@ -145,6 +178,22 @@ static gboolean start_hime_server (void) {
 
     if (pid == 0) {
         setenv ("HIME_DAEMON", "", TRUE);
+        // the daemon needs X11 even when started from a Wayland client
+        // that sets GDK_BACKEND=wayland
+        setenv ("GDK_BACKEND", "x11", TRUE);
+
+        // do not hold the application's stdio open, e.g. a pipe the caller
+        // waits on
+        const int devnull = open ("/dev/null", O_RDWR);
+        if (devnull >= 0) {
+            dup2 (devnull, STDIN_FILENO);
+            dup2 (devnull, STDOUT_FILENO);
+            dup2 (devnull, STDERR_FILENO);
+            if (devnull > STDERR_FILENO) {
+                close (devnull);
+            }
+        }
+
         execl (execbin, "hime", NULL);
         _exit (127);
     }
@@ -179,21 +228,40 @@ static HIME_client_handle *hime_im_client_reopen (HIME_client_handle *hime_ch,
     int ipv4 = FALSE;
     Server_IP_port srv_ip_port;
 
+    if (is_special_user ()) {
+        goto next;
+    }
+
     // -----------------------------------------------------------------------
     // trying to create a UNIX domain socket (AF_UNIX) connection
     // -----------------------------------------------------------------------
 
-    sockfd = connect_unix_socket ();
+    sockfd = connect_well_known_socket ();
 
-    if (!sockfd && !is_special_user () && !getenv ("HIME_IM_CLIENT_NO_AUTO_EXEC") &&
-        start_hime_server ()) {
+    // On X11, a daemon on this display owns a selection and publishes its
+    // socket path, which finds it even if it uses another path.
+    Window hime_win = None;
+    if (!sockfd && display) {
+        hime_win = find_hime_window (display);
+        if (hime_win != None) {
+            sockfd = connect_published_socket (display, hime_win);
+        }
+    }
+
+    // Start a daemon only if none is running.  Waiting for it blocks the
+    // application, so do that at most once: if the daemon dies after it
+    // daemonized, later requests just retry the connection.
+    static gboolean waited_in_vain;
+    if (!sockfd && hime_win == None && !getenv ("HIME_IM_CLIENT_NO_AUTO_EXEC") &&
+        start_hime_server () && !waited_in_vain) {
         // the daemon opens its socket shortly after it daemonizes
         const int MAX_TRY = 30;
         int loop;
         for (loop = 0; loop < MAX_TRY && !sockfd; loop++) {
             usleep (100000);
-            sockfd = connect_unix_socket ();
+            sockfd = connect_well_known_socket ();
         }
+        waited_in_vain = !sockfd;
     }
 
     if (sockfd) {
@@ -215,7 +283,9 @@ static HIME_client_handle *hime_im_client_reopen (HIME_client_handle *hime_ch,
         goto next;
     }
 
-    Window hime_win = find_hime_window (display);
+    if (hime_win == None) {
+        hime_win = find_hime_window (display);
+    }
     if (hime_win == None) {
         goto next;
     }
