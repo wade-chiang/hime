@@ -60,6 +60,7 @@ autom4te.cache/
 config.log
 config.status
 compile
+install-sh
 missing
 *Makefile
 *Makefile.in

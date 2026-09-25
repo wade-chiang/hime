@@ -1,6 +1,6 @@
 CFLAGS += $(OPTFLAGS) $(GTKINC) \
-		-DGDK_DISABLE_SINGLE_INCLUDES -DGDK_DISABLE_DEPRECATED \
-		-DGTK_DISABLE_SINGLE_INCLUDES -DGTK_DISABLE_DEPRECATED \
+		-DGDK_DISABLE_SINGLE_INCLUDES \
+		-DGTK_DISABLE_SINGLE_INCLUDES \
 		-DG_DISABLE_SINGLE_INCLUDES \
 		-DGSEAL_ENABLE \
 		-DHIME_BIN_DIR=\"$(HIME_BIN_DIR)\" \
@@ -150,6 +150,13 @@ if USE_UNITY_TRAY
 CFLAGS     += -DTRAY_UNITY=1
 OBJS       += tray-appindicator.o
 endif
+endif
+
+# GTK 3 still ships the deprecated APIs HIME uses (GtkStatusIcon,
+# GtkColorSelection, ...); hiding them turns every call into an
+# implicit declaration, which modern compilers reject.
+if GTK2
+CFLAGS     += -DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED
 endif
 
 CFLAGS     += -DHIME_I18N_MESSAGE=1

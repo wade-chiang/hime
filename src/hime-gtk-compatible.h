@@ -41,9 +41,6 @@
 #define GtkStatusIcon GObject
 #define gtk_status_icon_position_menu NULL
 
-#define GTK_COLOR_SELECTION
-#define GTK_COLOR_SELECTION_DIALOG
-
 #define GDK_WINDOW_XWINDOW GDK_WINDOW_XID
 #endif
 
@@ -79,7 +76,7 @@
 #endif
 
 // XXX(xatier): both gtk_widget_modify_font and gtk_widget_override_font are deprecated
-#ifndef gtk_widget_override_font
+#if !GTK_CHECK_VERSION(3, 0, 0)
 #define gtk_widget_override_font gtk_widget_modify_font
 #endif
 
@@ -92,16 +89,27 @@
 
 #if GTK_CHECK_VERSION(3, 9, 10)
 #define gtk_button_new_from_stock(x) gtk_button_new_from_icon_name (x, GTK_ICON_SIZE_BUTTON)
+#undef GTK_STOCK_CANCEL
 #define GTK_STOCK_CANCEL "gtk-cancel"
+#undef GTK_STOCK_OK
 #define GTK_STOCK_OK "gtk-ok"
+#undef GTK_STOCK_QUIT
 #define GTK_STOCK_QUIT "gtk-quit"
+#undef GTK_STOCK_SAVE
 #define GTK_STOCK_SAVE "gtk-save"
+#undef GTK_STOCK_OPEN
 #define GTK_STOCK_OPEN "gtk-open"
+#undef GTK_STOCK_CLOSE
 #define GTK_STOCK_CLOSE "gtk-close"
+#undef GTK_STOCK_DELETE
 #define GTK_STOCK_DELETE "gtk-delete"
+#undef GTK_STOCK_FIND
 #define GTK_STOCK_FIND "gtk-find"
+#undef GTK_STOCK_ABOUT
 #define GTK_STOCK_ABOUT "gtk-about"
+#undef GTK_STOCK_PREFERENCES
 #define GTK_STOCK_PREFERENCES "gtk-preferences"
+#undef GTK_STOCK_INDEX
 #define GTK_STOCK_INDEX "gtk-index"
 #endif
 
