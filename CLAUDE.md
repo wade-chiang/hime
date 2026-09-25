@@ -83,7 +83,11 @@ the input but leaves the candidate row shown.
 - `src/gtab*.c`: table engine; `src/win-gtab.c` is its window.
 - `src/pho*.c`, `src/tsin*.c`: Zhuyin and phrase (tsin) engines.
 - `src/modules/`: loadable modules (Anthy, Chewing, intcode).
-- `src/gtk-im/`, `src/gtk3-im/`, `src/qt5-im/`, `src/qt6-im/`: IM modules.
+- `src/gtk-im/`, `src/gtk3-im/`, `src/gtk4-im/`, `src/qt5-im/`,
+  `src/qt6-im/`: IM modules. The three GTK modules share the sources in
+  `src/gtk-im/` (the other directories hold symlinks); GTK 4 differences
+  are `#if GTK_CHECK_VERSION(4, 0, 0)` branches. GTK 4 loads
+  `libim-hime.so` as a GIO module from `$GTK_PATH/4.0.0/immodules`.
 
 ## Wayland plan
 

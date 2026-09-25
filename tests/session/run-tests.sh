@@ -5,8 +5,8 @@
 # Lines starting with # are comments.  Directives:
 #
 #   @program NAME   the client typing the keys (default hime-client-test,
-#                   a client without an X display; gtk3-im-test goes
-#                   through the GTK 3 IM module)
+#                   a client without an X display; gtk3-im-test and
+#                   gtk4-im-test go through the GTK IM modules)
 #   @x11            run the client on Xwayland instead of Wayland
 #
 # Usage: run-tests.sh [--update]

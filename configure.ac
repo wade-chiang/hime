@@ -232,6 +232,30 @@ AS_IF(
   ]
 )
 AM_CONDITIONAL([GTK2], [test "x$with_gtk" = "x2.0"])
+# GTK4_IM
+PKG_CHECK_MODULES(
+  [GTK4],
+  [gtk4 >= 4.12],
+  [gtk4_is_installed=yes],
+  [gtk4_is_installed=no]
+)
+AC_ARG_ENABLE(
+  [gtk4-immodule],
+  [AS_HELP_STRING([--enable-gtk4-immodule], [Enable GTK 4 im-module, default is auto-detect])],
+  [enable_gtk4_immodule=$enableval],
+  [enable_gtk4_immodule=$gtk4_is_installed]
+)
+AS_IF(
+  [test "x$enable_gtk4_immodule" = "xyes"],
+  [
+    AS_IF(
+      [test "x$gtk4_is_installed" = "xno"],
+      [AC_MSG_ERROR([Require GTK 4 (>= 4.12) installed])]
+    )
+    AC_SUBST([GTK4_IM], ["Y"])
+  ],
+  [AC_SUBST([GTK4_IM], ["N"])]
+)
 # Qt
 # QT5_IM
 # QT6_IM
@@ -478,6 +502,7 @@ AC_CONFIG_FILES([
   src/Makefile
   src/gtk-im/Makefile
   src/gtk3-im/Makefile
+  src/gtk4-im/Makefile
   src/im-client/Makefile
   src/IMdkit/Makefile
   src/IMdkit/lib/Makefile

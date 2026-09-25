@@ -23,6 +23,31 @@
 #include "gtkimcontexthime.h"
 #include "gtkintl.h"
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+
+// GTK 4 loads IM modules as GIO modules; GIO derives these symbol names
+// from the file name, libim-hime.so.
+
+G_MODULE_EXPORT void g_io_im_hime_load (GIOModule *module) {
+    g_type_module_use (G_TYPE_MODULE (module));
+    gtk_im_context_hime_register_type (G_TYPE_MODULE (module));
+
+    // priority 0: only used when chosen, e.g. with GTK_IM_MODULE=hime
+    g_io_extension_point_implement (GTK_IM_MODULE_EXTENSION_POINT_NAME,
+                                    GTK_TYPE_IM_CONTEXT_HIME, "hime", 0);
+}
+
+G_MODULE_EXPORT void g_io_im_hime_unload (GIOModule *module) {
+    gtk_im_context_hime_shutdown ();
+}
+
+G_MODULE_EXPORT char **g_io_im_hime_query (void) {
+    char *extension_points[] = {GTK_IM_MODULE_EXTENSION_POINT_NAME, NULL};
+    return g_strdupv (extension_points);
+}
+
+#else
+
 static const GtkIMContextInfo hime_info = {
     "hime",                   /* unique identification string */
     N_ ("hime Input Method"), /* human-readable name */
@@ -56,3 +81,5 @@ GtkIMContext *im_module_create (const gchar *context_id) {
 
     return NULL;
 }
+
+#endif

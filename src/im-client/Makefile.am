@@ -42,6 +42,7 @@ endif
 	ln -sf $(SOFILEVER) $(SOFILE).1
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C ../gtk-im; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C ../gtk3-im; fi
+	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C ../gtk4-im; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C ../qt5-im; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C ../qt6-im; fi
 

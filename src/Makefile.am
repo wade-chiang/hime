@@ -202,6 +202,7 @@ all: $(PROGS) $(PROGS_SYM) $(DATA) $(PROGS_CV)
 	$(MAKE) -C modules
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im; fi
+	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im; fi
 
@@ -259,9 +260,15 @@ GTK3_IM_TEST = ../tests/session/gtk3-im-test
 $(GTK3_IM_TEST): ../tests/session/gtk-im-test.c
 	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk+-3.0`
 
+GTK4_IM_TEST = ../tests/session/gtk4-im-test
+
+$(GTK4_IM_TEST): ../tests/session/gtk-im-test.c
+	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk4`
+
 .PHONY: session-test-programs
 session-test-programs: $(HIME_CLIENT_TEST)
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) $(GTK3_IM_TEST); fi
+	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) $(GTK4_IM_TEST); fi
 
 hime-tslearn: $(OBJS_TSLEARN) im-client/libhime-im-client.so
 	@echo "linking $@ ..."
@@ -373,6 +380,7 @@ install:
 	$(MAKE) -C modules install
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im install; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im install; fi
+	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im install; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im install; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im install; fi
 
@@ -384,6 +392,7 @@ uninstall:
 	$(MAKE) -C modules uninstall
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im uninstall; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im uninstall; fi
+	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im uninstall; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im uninstall; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im uninstall; fi
 	rmdir --ignore-fail-on-non-empty $(bindir)
@@ -398,10 +407,11 @@ clean:
 	$(MAKE) -C modules clean
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im clean; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im clean; fi
+	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im clean; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im clean; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im clean; fi
 	@rm -f *.o *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
 		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
-		$(GTK3_IM_TEST)
+		$(GTK3_IM_TEST) $(GTK4_IM_TEST)
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;

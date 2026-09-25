@@ -108,6 +108,13 @@ if [[ -f "$top/src/gtk3-im/im-hime.so" ]]; then
     export GTK_IM_MODULE_FILE="$tmp/immodules.cache"
 fi
 
+# GTK 4 scans $GTK_PATH/4.0.0/immodules for GIO modules
+if [[ -f "$top/src/gtk4-im/libim-hime.so" ]]; then
+    mkdir -p "$tmp/gtk-path/4.0.0/immodules"
+    ln -sf "$top/src/gtk4-im/libim-hime.so" "$tmp/gtk-path/4.0.0/immodules/"
+    export GTK_PATH="$tmp/gtk-path"
+fi
+
 if [[ "${HIME_SESSION_X11:-}" == 1 ]]; then
     export DISPLAY="$x_display" XAUTHORITY="$x_auth" GDK_BACKEND=x11
 fi

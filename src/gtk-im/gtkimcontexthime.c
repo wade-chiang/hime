@@ -30,10 +30,17 @@
 
 #define DBG 0
 
+// what the context is attached to: a widget in GTK 4, a window before
+#if GTK_CHECK_VERSION(4, 0, 0)
+typedef GtkWidget HIMEClient;
+#else
+typedef GdkWindow HIMEClient;
+#endif
+
 struct _GtkIMContextHIME {
     GtkIMContext object;
 
-    GdkWindow *client_window;
+    HIMEClient *client;
 
     HIME_client_handle *hime_ch;
 
@@ -55,14 +62,19 @@ static void gtk_im_context_hime_init (GtkIMContextHIME *im_context_hime);
 static void gtk_im_context_hime_finalize (GObject *obj);
 
 // GtkIMContext functions
-static void gtk_im_context_hime_set_client_window (GtkIMContext *context,
-                                                   GdkWindow *client_window);
+static void gtk_im_context_hime_set_client (GtkIMContext *context,
+                                            HIMEClient *client);
 static void gtk_im_context_hime_get_preedit_string (GtkIMContext *context,
                                                     gchar **str,
                                                     PangoAttrList **attrs,
                                                     gint *cursor_pos);
+#if GTK_CHECK_VERSION(4, 0, 0)
+static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
+                                                     GdkEvent *event);
+#else
 static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
                                                      GdkEventKey *event);
+#endif
 static void gtk_im_context_hime_focus_in (GtkIMContext *context);
 static void gtk_im_context_hime_focus_out (GtkIMContext *context);
 static void gtk_im_context_hime_reset (GtkIMContext *context);
@@ -119,7 +131,11 @@ static void gtk_im_context_hime_class_init (GtkIMContextHIMEClass *class) {
 
     parent_class = g_type_class_peek_parent (class);
 
-    im_context_class->set_client_window = gtk_im_context_hime_set_client_window;
+#if GTK_CHECK_VERSION(4, 0, 0)
+    im_context_class->set_client_widget = gtk_im_context_hime_set_client;
+#else
+    im_context_class->set_client_window = gtk_im_context_hime_set_client;
+#endif
     im_context_class->get_preedit_string = gtk_im_context_hime_get_preedit_string;
     im_context_class->filter_keypress = gtk_im_context_hime_filter_keypress;
     im_context_class->focus_in = gtk_im_context_hime_focus_in;
@@ -146,7 +162,7 @@ init_preedit (GtkIMContextHIME *im_context_hime) {
 
 static void
 gtk_im_context_hime_init (GtkIMContextHIME *im_context_hime) {
-    im_context_hime->client_window = NULL;
+    im_context_hime->client = NULL;
     im_context_hime->hime_ch = NULL;
     init_preedit (im_context_hime);
 }
@@ -181,7 +197,7 @@ static void gtk_im_context_hime_finalize (GObject *obj) {
         context_xim->hime_ch = NULL;
     }
 
-    context_xim->client_window = NULL;
+    context_xim->client = NULL;
 
     parent_class->finalize (obj);
 }
@@ -194,12 +210,54 @@ static Display *get_x_display (GdkDisplay *display) {
         return NULL;
     }
 #endif
+#if GTK_CHECK_VERSION(4, 0, 0)
+    return gdk_x11_display_get_xdisplay (display);
+#else
     return GDK_DISPLAY_XDISPLAY (display);
+#endif
 }
+
+// Tell the daemon the client's X window, which lets it place its window at
+// the cursor.  Clients on other backends have none.
+static void update_client_window (GtkIMContextHIME *context_xim) {
+    if (!context_xim->hime_ch || !context_xim->client) {
+        return;
+    }
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+    GtkNative *native = gtk_widget_get_native (context_xim->client);
+    GdkSurface *surface = native ? gtk_native_get_surface (native) : NULL;
+    if (!surface || !GDK_IS_X11_SURFACE (surface)) {
+        return;
+    }
+    hime_im_client_set_client_window (context_xim->hime_ch,
+                                      gdk_x11_surface_get_xid (surface));
+#else
+#if GTK_CHECK_VERSION(3, 0, 0)
+    if (!GDK_IS_X11_WINDOW (context_xim->client)) {
+        return;
+    }
+#endif
+    hime_im_client_set_client_window (context_xim->hime_ch,
+                                      GDK_WINDOW_XID (context_xim->client));
+#endif
+}
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+// GDK 4 modifier masks match the X core ones for Shift, Lock, Control and
+// Alt (Mod1); Super is a separate bit, which hime expects as Mod4.
+static uint32_t x_modifier_state (GdkModifierType state) {
+    uint32_t x_state = state & (GDK_SHIFT_MASK | GDK_LOCK_MASK | GDK_CONTROL_MASK | GDK_ALT_MASK);
+    if (state & GDK_SUPER_MASK) {
+        x_state |= Mod4Mask;
+    }
+    return x_state;
+}
+#endif
 
 static void get_hime_im_client (GtkIMContextHIME *context_xim) {
 
-    if (!context_xim->client_window) {
+    if (!context_xim->client) {
         return;
     }
 
@@ -218,29 +276,18 @@ static void get_hime_im_client (GtkIMContextHIME *context_xim) {
     }
 }
 
-static void gtk_im_context_hime_set_client_window (GtkIMContext *context,
-                                                   GdkWindow *client_window) {
+static void gtk_im_context_hime_set_client (GtkIMContext *context,
+                                            HIMEClient *client) {
     GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (context);
 
-    if (!client_window) {
+    context_xim->client = client;
+
+    if (!client) {
         return;
     }
-
-    context_xim->client_window = client_window;
 
     get_hime_im_client (context_xim);
-
-#if GTK_CHECK_VERSION(3, 0, 0)
-    // only an X window lets the daemon place its window at the cursor
-    if (!GDK_IS_X11_WINDOW (client_window)) {
-        return;
-    }
-#endif
-
-    if (context_xim->hime_ch) {
-        hime_im_client_set_client_window (context_xim->hime_ch,
-                                          GDK_WINDOW_XID (client_window));
-    }
+    update_client_window (context_xim);
 }
 
 static void gtk_im_context_hime_get_preedit_string (
@@ -283,8 +330,19 @@ static void gtk_im_context_hime_get_preedit_string (
     }
 }
 
+#if GTK_CHECK_VERSION(4, 0, 0)
+static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
+                                                     GdkEvent *event) {
+    const gboolean press = gdk_event_get_event_type (event) == GDK_KEY_PRESS;
+    const guint keyval = gdk_key_event_get_keyval (event);
+    const uint32_t state = x_modifier_state (gdk_event_get_modifier_state (event));
+#else
 static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
                                                      GdkEventKey *event) {
+    const gboolean press = event->type == GDK_KEY_PRESS;
+    const guint keyval = event->keyval;
+    const uint32_t state = event->state;
+#endif
     GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (context);
 
     // text of the key, committed as is when hime does not take the key
@@ -299,12 +357,12 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
 
     // GDK key values are X keysyms, already translated for the modifier
     // state; hime works with those on every backend.
-    const KeySym keysym = event->keyval;
+    const KeySym keysym = keyval;
 
     // Convert from a GDK key symbol to the corresponding ISO10646 (Unicode) character.
     // returns 0 if there is no corresponding character.
     gsize num_bytes = 0;
-    const guint32 unicode = gdk_keyval_to_unicode (event->keyval);
+    const guint32 unicode = gdk_keyval_to_unicode (keyval);
     if (unicode) {
         num_bytes = g_unichar_to_utf8 (unicode, buffer);
     }
@@ -313,12 +371,12 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
     // tell hime-im-client to process key event
     // result_str would hold the result
     gboolean context_has_str = context_xim->pe_str && context_xim->pe_str[0];
-    if (event->type == GDK_KEY_PRESS) {
+    if (press) {
         result = hime_im_client_forward_key_press (context_xim->hime_ch,
-                                                   keysym, event->state, &result_str);
+                                                   keysym, state, &result_str);
     } else {
         result = hime_im_client_forward_key_release (context_xim->hime_ch,
-                                                     keysym, event->state, &result_str);
+                                                     keysym, state, &result_str);
     }
 
     char *preedit_str = NULL;
@@ -379,13 +437,13 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
         context_xim->pe_cursor = cursor_pos;
     }
 
-    const gboolean alt_or_control_pressed = event->state & (GDK_MOD1_MASK | GDK_CONTROL_MASK);
+    const gboolean alt_or_control_pressed = state & (Mod1Mask | ControlMask);
     // GDK_KEY_PRESS event
     // hime_im_client_forward_key_press returns False
     // result_str is empty
     // buffer[0] is printable
     // not alt_or_control_pressed
-    if (event->type == GDK_KEY_PRESS &&
+    if (press &&
         !result &&
         !result_str &&
         num_bytes &&
@@ -420,6 +478,9 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
 static void gtk_im_context_hime_focus_in (GtkIMContext *context) {
     GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (context);
 
+    // a GTK 4 widget may have been realized since it was attached
+    update_client_window (context_xim);
+
     if (context_xim->hime_ch) {
         hime_im_client_focus_in (context_xim->hime_ch);
     }
@@ -453,11 +514,26 @@ static void gtk_im_context_hime_set_cursor_location (GtkIMContext *context,
         get_hime_im_client (context_xim);
     }
 
+    int x = area->x;
+    int y = area->y + area->height;
+
+#if GTK_CHECK_VERSION(4, 0, 0)
+    // area is relative to the client widget; the daemon expects coordinates
+    // relative to the window, i.e. the native surface
+    GtkNative *native = context_xim->client ? gtk_widget_get_native (context_xim->client) : NULL;
+    graphene_point_t point;
+    if (native &&
+        gtk_widget_compute_point (context_xim->client, GTK_WIDGET (native),
+                                  &GRAPHENE_POINT_INIT (x, y), &point)) {
+        double surface_x = 0, surface_y = 0;
+        gtk_native_get_surface_transform (native, &surface_x, &surface_y);
+        x = point.x + surface_x;
+        y = point.y + surface_y;
+    }
+#endif
+
     if (context_xim->hime_ch) {
-        hime_im_client_set_cursor_location (
-            context_xim->hime_ch,
-            area->x,
-            area->y + area->height);
+        hime_im_client_set_cursor_location (context_xim->hime_ch, x, y);
     }
 }
 

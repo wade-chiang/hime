@@ -1,0 +1,4 @@
+@program gtk4-im-test
+# A native Wayland GTK 4 application typing through the HIME IM module.
+b 1 a <space> c 2 x <space>
+b c <bs> <space> , <space>

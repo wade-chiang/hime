@@ -619,6 +619,9 @@ QT5_LIBS
 QT5_CFLAGS
 QT6_IM
 QT5_IM
+GTK4_IM
+GTK4_LIBS
+GTK4_CFLAGS
 GTK2_FALSE
 GTK2_TRUE
 APPINDICATOR
@@ -772,6 +775,7 @@ enable_xim
 enable_system_tray
 enable_lib64
 with_gtk
+enable_gtk4_immodule
 enable_qt5_immodule
 with_qt5_moc_path
 with_qt5_im_module_path
@@ -802,6 +806,8 @@ GTK2_CFLAGS
 GTK2_LIBS
 GTK3_CFLAGS
 GTK3_LIBS
+GTK4_CFLAGS
+GTK4_LIBS
 QT5_CFLAGS
 QT5_LIBS
 ANTHY_CFLAGS
@@ -1442,6 +1448,7 @@ Optional Features:
   --enable-xim            Enable XIM, default is yes
   --enable-system-tray    Enable System Tray, default is yes
   --enable-lib64          Use lib64 directory, default is auto-detect
+  --enable-gtk4-immodule  Enable GTK 4 im-module, default is auto-detect
   --enable-qt5-immodule   Enable QT5 im-module, default is auto-detect
   --enable-qt6-immodule   Enable QT6 im-module, default is auto-detect
   --enable-anthy          Enable Anthy, default is auto-detect
@@ -1482,6 +1489,8 @@ Some influential environment variables:
   GTK2_LIBS   linker flags for GTK2, overriding pkg-config
   GTK3_CFLAGS C compiler flags for GTK3, overriding pkg-config
   GTK3_LIBS   linker flags for GTK3, overriding pkg-config
+  GTK4_CFLAGS C compiler flags for GTK4, overriding pkg-config
+  GTK4_LIBS   linker flags for GTK4, overriding pkg-config
   QT5_CFLAGS  C compiler flags for QT5, overriding pkg-config
   QT5_LIBS    linker flags for QT5, overriding pkg-config
   ANTHY_CFLAGS
@@ -5889,6 +5898,107 @@ else
   GTK2_FALSE=
 fi
 
+# GTK4_IM
+
+pkg_failed=no
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for gtk4 >= 4.12" >&5
+printf %s "checking for gtk4 >= 4.12... " >&6; }
+
+if test -n "$GTK4_CFLAGS"; then
+    pkg_cv_GTK4_CFLAGS="$GTK4_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gtk4 >= 4.12\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gtk4 >= 4.12") 2>&5
+  ac_status=$?
+  printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GTK4_CFLAGS=`$PKG_CONFIG --cflags "gtk4 >= 4.12" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$GTK4_LIBS"; then
+    pkg_cv_GTK4_LIBS="$GTK4_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gtk4 >= 4.12\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gtk4 >= 4.12") 2>&5
+  ac_status=$?
+  printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_GTK4_LIBS=`$PKG_CONFIG --libs "gtk4 >= 4.12" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                GTK4_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "gtk4 >= 4.12" 2>&1`
+        else
+                GTK4_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "gtk4 >= 4.12" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$GTK4_PKG_ERRORS" >&5
+
+        gtk4_is_installed=no
+
+elif test $pkg_failed = untried; then
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+        gtk4_is_installed=no
+
+else
+        GTK4_CFLAGS=$pkg_cv_GTK4_CFLAGS
+        GTK4_LIBS=$pkg_cv_GTK4_LIBS
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf '%s\n' "yes" >&6; }
+        gtk4_is_installed=yes
+fi
+# Check whether --enable-gtk4-immodule was given.
+if test ${enable_gtk4_immodule+y}
+then :
+  enableval=$enable_gtk4_immodule; enable_gtk4_immodule=$enableval
+else case e in #(
+  e) enable_gtk4_immodule=$gtk4_is_installed
+ ;;
+esac
+fi
+
+if test "x$enable_gtk4_immodule" = "xyes"
+then :
+
+    if test "x$gtk4_is_installed" = "xno"
+then :
+  as_fn_error $? "Require GTK 4 (>= 4.12) installed" "$LINENO" 5
+
+fi
+    GTK4_IM="Y"
+
+
+else case e in #(
+  e) GTK4_IM="N"
+
+ ;;
+esac
+fi
 # Qt
 # QT5_IM
 # QT6_IM
@@ -6637,7 +6747,7 @@ fi
 
 # Checks for library functions.
 
-ac_config_files="$ac_config_files Makefile data/Makefile filter/Makefile icons/Makefile man/Makefile menu/Makefile po/Makefile scripts/Makefile src/Makefile src/gtk-im/Makefile src/gtk3-im/Makefile src/im-client/Makefile src/IMdkit/Makefile src/IMdkit/lib/Makefile src/modules/Makefile src/qt5-im/Makefile src/qt6-im/Makefile"
+ac_config_files="$ac_config_files Makefile data/Makefile filter/Makefile icons/Makefile man/Makefile menu/Makefile po/Makefile scripts/Makefile src/Makefile src/gtk-im/Makefile src/gtk3-im/Makefile src/gtk4-im/Makefile src/im-client/Makefile src/IMdkit/Makefile src/IMdkit/lib/Makefile src/modules/Makefile src/qt5-im/Makefile src/qt6-im/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -7388,6 +7498,7 @@ do
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
     "src/gtk-im/Makefile") CONFIG_FILES="$CONFIG_FILES src/gtk-im/Makefile" ;;
     "src/gtk3-im/Makefile") CONFIG_FILES="$CONFIG_FILES src/gtk3-im/Makefile" ;;
+    "src/gtk4-im/Makefile") CONFIG_FILES="$CONFIG_FILES src/gtk4-im/Makefile" ;;
     "src/im-client/Makefile") CONFIG_FILES="$CONFIG_FILES src/im-client/Makefile" ;;
     "src/IMdkit/Makefile") CONFIG_FILES="$CONFIG_FILES src/IMdkit/Makefile" ;;
     "src/IMdkit/lib/Makefile") CONFIG_FILES="$CONFIG_FILES src/IMdkit/lib/Makefile" ;;

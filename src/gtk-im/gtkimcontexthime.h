@@ -21,14 +21,20 @@
 #ifndef GTKIMCONTEXTHIME_H
 #define GTKIMCONTEXTHIME_H
 
-#include <gdk/gdkx.h>
 #include <gtk/gtk.h>
 #include <gtk/gtkimmodule.h>
+#if GTK_CHECK_VERSION(4, 0, 0)
+#include <gdk/x11/gdkx.h>
+#else
+#include <gdk/gdkx.h>
+#endif
 #if !GTK_CHECK_VERSION(3, 0, 0)
 #include <gdk/gdkkeysyms.h>
 #endif
 
+#if !GTK_CHECK_VERSION(4, 0, 0)
 #include "../hime-gtk-compatible.h"
+#endif
 
 extern GType gtk_type_im_context_hime;
 
