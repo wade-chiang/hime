@@ -204,6 +204,7 @@ gboolean ProcessKeyPress (KeySym keysym, uint32_t kev_state);
 gboolean ProcessKeyRelease (KeySym keysym, uint32_t kev_state);
 int hime_FocusIn (ClientState *cs);
 int hime_FocusOut (ClientState *cs);
+void hime_forget_client (ClientState *cs);
 int hime_get_preedit (ClientState *cs, char *str, HIME_PREEDIT_ATTR attr[], int *cursor, int *sub_comp_len);
 int current_fullwidth_mode (void);
 void clear_output_buffer (void);

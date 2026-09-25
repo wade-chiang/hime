@@ -110,6 +110,7 @@ static void shutdown_client (const int fd) {
         current_CS = NULL;
     }
 
+    hime_forget_client (hime_clients[idx].cs);
     free (hime_clients[idx].cs);
     hime_clients[idx].cs = NULL;
     hime_clients[idx].fd = 0;

@@ -443,8 +443,12 @@ void move_IC_in_win (ClientState *cs) {
 
     if (!inpwin) {
         // Without an X window (a native Wayland client) the spot location
-        // cannot be mapped to the screen: use the fixed position.
-        move_in_win (cs, hime_root_x, hime_root_y);
+        // cannot be mapped to the screen: use the fixed position.  Only for
+        // the current HIME protocol client; an XIM IC without a window yet
+        // must not move the input window of the focused one.
+        if (cs->b_hime_protocol && cs == current_CS) {
+            move_in_win (cs, hime_root_x, hime_root_y);
+        }
         return;
     }
 
@@ -1246,6 +1250,16 @@ int skip_window (Window win) {
 
 void hime_reset ();
 
+// the client that last got the focus, see hime_FocusIn
+static ClientState *focus_cs;
+
+// cs is about to be freed: a new client may get its address
+void hime_forget_client (ClientState *cs) {
+    if (focus_cs == cs) {
+        focus_cs = NULL;
+    }
+}
+
 int hime_FocusIn (ClientState *cs) {
     Window win = cs->client_win;
 
@@ -1257,7 +1271,6 @@ int hime_FocusIn (ClientState *cs) {
         // Clients without an X window all have win == 0; tell them apart
         // by their state so input pending in one does not leak to another.
         // (current_CS cannot tell: new connections already switch it.)
-        static ClientState *focus_cs;
         if (focus_win != win || (!win && focus_cs != cs)) {
             hime_reset ();
             hide_in_win (current_CS);

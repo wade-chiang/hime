@@ -1,0 +1,4 @@
+# A client quits with input pending and another one connects: the new
+# client must not inherit the pending keys, even if its state reuses the
+# memory of the old one.
+b c @new a <space>

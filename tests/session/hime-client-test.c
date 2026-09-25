@@ -24,8 +24,10 @@
  * Usage: hime-client-test [-m MESSAGE] KEY...
  *   KEY is a single printable character or one of <space> <enter> <bs>
  *   <esc>.  @1 and @2 move the focus to the first or a second client
- *   connection (two text fields, both without an X window).  -m sends a
- *   daemon message (as hime-setup does) first.
+ *   connection (two text fields, both without an X window); @new closes
+ *   the focused connection and focuses a new one in its place (an
+ *   application quits, another starts).  -m sends a daemon message (as
+ *   hime-setup does) first.
  * Exit status: 0 if connected, 1 if no daemon could be reached.
  */
 
@@ -83,6 +85,15 @@ int main (int argc, char **argv) {
     hime_im_client_focus_in (handle);
 
     for (; argi < argc; argi++) {
+        if (!strcmp (argv[argi], "@new")) {
+            const int i = handle == clients[0] ? 0 : 1;
+            hime_im_client_close (handle);
+            clients[i] = handle = open_client ();
+            hime_im_client_focus_in (handle);
+            printf ("%s\n", argv[argi]);
+            continue;
+        }
+
         if (!strcmp (argv[argi], "@1") || !strcmp (argv[argi], "@2")) {
             const int i = argv[argi][1] - '1';
             if (!clients[i])
