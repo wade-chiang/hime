@@ -1,0 +1,8 @@
+b        eat 
+c        eat 
+@2
+a        eat 
+<space>  eat  commit="一"
+@1
+d        eat 
+<space>  eat  commit="天"

@@ -81,8 +81,9 @@ fi
 x_display="$(sed -n 's/.*Using public X11 display \(:[0-9]*\).*/\1/p' "$log" | head -1)"
 x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1)"
 
-# The daemon still needs X for its windows: run it on mutter's Xwayland.
-DISPLAY="$x_display" XAUTHORITY="$x_auth" GDK_BACKEND=x11 \
+# The daemon still needs X for its windows; it picks the X11 backend
+# itself, which run-session.sh relies on by not setting GDK_BACKEND.
+DISPLAY="$x_display" XAUTHORITY="$x_auth" \
     HIME_TABLE_DIR="$top/data" \
     "$top/src/hime" >"$tmp/hime.log" 2>&1 &
 hime_pid=$!

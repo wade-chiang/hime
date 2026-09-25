@@ -442,7 +442,9 @@ void move_IC_in_win (ClientState *cs) {
     Window inpwin = cs->client_win;
 
     if (!inpwin) {
-        dbg ("no inpwin\n");
+        // Without an X window (a native Wayland client) the spot location
+        // cannot be mapped to the screen: use the fixed position.
+        move_in_win (cs, hime_root_x, hime_root_y);
         return;
     }
 
@@ -1252,11 +1254,16 @@ int hime_FocusIn (ClientState *cs) {
     if (cs) {
         Window win = cs->client_win;
 
-        if (focus_win != win) {
+        // Clients without an X window all have win == 0; tell them apart
+        // by their state so input pending in one does not leak to another.
+        // (current_CS cannot tell: new connections already switch it.)
+        static ClientState *focus_cs;
+        if (focus_win != win || (!win && focus_cs != cs)) {
             hime_reset ();
             hide_in_win (current_CS);
             focus_win = win;
         }
+        focus_cs = cs;
     }
 
     current_CS = cs;

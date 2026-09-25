@@ -572,6 +572,11 @@ static void screen_size_changed (GdkScreen *screen, gpointer user_data) {
 #include "lang.h"
 
 int main (int argc, char **argv) {
+#if GTK_CHECK_VERSION(3, 10, 0)
+    // The daemon's windows and XIM still need X11; on a Wayland desktop run
+    // on Xwayland even when started from a native Wayland client.
+    gdk_set_allowed_backends ("x11");
+#endif
     gtk_init (&argc, &argv);
 
     signal (SIGCHLD, SIG_IGN);

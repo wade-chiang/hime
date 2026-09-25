@@ -284,8 +284,10 @@ void process_client_req (const int fd) {
 
     parse_client_req (&req);
 
+    // Connections from the same X window share its state.  Clients without
+    // an X window (native Wayland) send 0 and each keep their own.
     ClientState *cs = NULL;
-    if (current_CS && (req.client_win == current_CS->client_win)) {
+    if (current_CS && req.client_win && (req.client_win == current_CS->client_win)) {
         cs = current_CS;
     } else {
         cs = hime_clients[fd].cs;

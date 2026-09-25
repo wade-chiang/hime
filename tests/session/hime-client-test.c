@@ -23,7 +23,9 @@
  *
  * Usage: hime-client-test [-m MESSAGE] KEY...
  *   KEY is a single printable character or one of <space> <enter> <bs>
- *   <esc>.  -m sends a daemon message (as hime-setup does) first.
+ *   <esc>.  @1 and @2 move the focus to the first or a second client
+ *   connection (two text fields, both without an X window).  -m sends a
+ *   daemon message (as hime-setup does) first.
  * Exit status: 0 if connected, 1 if no daemon could be reached.
  */
 
@@ -59,12 +61,18 @@ static KeySym parse_key (const char *tok) {
     return NoSymbol;
 }
 
-int main (int argc, char **argv) {
+static HIME_client_handle *open_client (void) {
     HIME_client_handle *handle = hime_im_client_open (NULL);
     if (!handle || handle->fd <= 0) {
         fprintf (stderr, "cannot connect to hime\n");
-        return 1;
+        exit (1);
     }
+    return handle;
+}
+
+int main (int argc, char **argv) {
+    HIME_client_handle *clients[2] = {open_client (), NULL};
+    HIME_client_handle *handle = clients[0];
 
     int argi = 1;
     if (argc > 2 && !strcmp (argv[1], "-m")) {
@@ -75,6 +83,17 @@ int main (int argc, char **argv) {
     hime_im_client_focus_in (handle);
 
     for (; argi < argc; argi++) {
+        if (!strcmp (argv[argi], "@1") || !strcmp (argv[argi], "@2")) {
+            const int i = argv[argi][1] - '1';
+            if (!clients[i])
+                clients[i] = open_client ();
+            hime_im_client_focus_out (handle);
+            handle = clients[i];
+            hime_im_client_focus_in (handle);
+            printf ("%s\n", argv[argi]);
+            continue;
+        }
+
         KeySym key = parse_key (argv[argi]);
         if (key == NoSymbol) {
             fprintf (stderr, "bad key: %s\n", argv[argi]);
@@ -96,6 +115,7 @@ int main (int argc, char **argv) {
     }
 
     hime_im_client_focus_out (handle);
-    hime_im_client_close (handle);
+    hime_im_client_close (clients[0]);
+    hime_im_client_close (clients[1]);
     return 0;
 }
