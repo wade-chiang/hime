@@ -209,9 +209,14 @@ $(IMdkitLIB):
 	@echo "building $@ ..."
 	$(MAKE) -C IMdkit/lib
 
-im-client/libhime-im-client.so:
-	@echo "building $@ ..."
+# Always ask im-client's own make: the library also compiles sources from
+# this directory (im-addr.c, hime-conf.c, ...), which a rule without
+# prerequisites here would never notice.
+.PHONY: im-client-lib
+im-client-lib:
 	$(MAKE) -C im-client
+
+im-client/libhime-im-client.so: im-client-lib
 
 hime: $(OBJS) $(IMdkitLIB) $(OBJ_IMSRV)
 	@echo "linking $@ ..."
