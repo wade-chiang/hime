@@ -287,6 +287,7 @@ void disp_tray_icon ();
 gboolean init_in_method (int in_no);
 #include "hime-protocol.h"
 #include "im-srv.h"
+#include "wl-im.h"
 
 static int get_in_method_by_filename (char filename[]) {
     int i, in_method = 0;
@@ -816,6 +817,7 @@ int main (int argc, char **argv) {
     signal (SIGHUP, sig_do_exit);
 
     init_hime_im_serv (xim_xwin);
+    wl_im_init ();
 
     exec_setup_scripts ();
 

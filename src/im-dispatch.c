@@ -33,6 +33,7 @@
 #include "hime-im-client.h"
 #include "hime-protocol.h"
 #include "im-srv.h"
+#include "wl-im.h"
 
 #define DBG 0
 
@@ -166,13 +167,18 @@ static int notify_fd (void) {
 }
 
 // Can text be committed to the focused client without a key event from it?
+// Also true for Wayland text-input fields (wl-im.c).
 gboolean hime_notify_ready (void) {
-    return notify_fd () >= 0;
+    return notify_fd () >= 0 || wl_im_ready ();
 }
 
 // Send the output buffer (text to commit, possibly none) to the focused
 // client, which then also refreshes its preedit.
 void hime_notify_send (void) {
+    if (wl_im_ready ()) {
+        wl_im_send ();
+        return;
+    }
     const int fd = notify_fd ();
     if (fd < 0) {
         return;

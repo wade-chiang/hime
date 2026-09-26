@@ -486,6 +486,40 @@ AS_IF(
     AC_SUBST([GTKLDFLAGS], ["$GTKLDFLAGS $LAYER_SHELL_LIBS"])
   ]
 )
+# WAYLAND_IM: the daemon as a Wayland input method (input-method-v2), when
+# it runs on GDK's Wayland backend, i.e. with layer-shell
+AS_IF(
+  [test "x$enable_layer_shell" = "xyes"],
+  [
+    PKG_CHECK_MODULES(
+      [WAYLAND_IM],
+      [wayland-client xkbcommon gtk+-wayland-3.0],
+      [wayland_im_is_installed=yes],
+      [wayland_im_is_installed=no]
+    )
+    PKG_CHECK_VAR([WAYLAND_SCANNER], [wayland-scanner], [wayland_scanner])
+    AS_IF([test -z "$WAYLAND_SCANNER"], [wayland_im_is_installed=no])
+  ],
+  [wayland_im_is_installed=no]
+)
+AC_ARG_ENABLE(
+  [wayland-im],
+  [AS_HELP_STRING([--enable-wayland-im], [Enable the Wayland input method frontend, default is auto-detect])],
+  [enable_wayland_im=$enableval],
+  [enable_wayland_im=$wayland_im_is_installed]
+)
+AS_IF(
+  [test "x$enable_wayland_im" = "xyes"],
+  [
+    AS_IF(
+      [test "x$wayland_im_is_installed" = "xno"],
+      [AC_MSG_ERROR([Require layer-shell support, xkbcommon and wayland-scanner])]
+    )
+    AC_SUBST([GTKINC], ["$GTKINC $WAYLAND_IM_CFLAGS -DHIME_WAYLAND_IM=1"])
+    AC_SUBST([GTKLDFLAGS], ["$GTKLDFLAGS $WAYLAND_IM_LIBS"])
+  ]
+)
+AM_CONDITIONAL([USE_WAYLAND_IM], [test "x$enable_wayland_im" = "xyes"])
 LDFLAGS+=" $GTKLDFLAGS"
 AS_IF(
   [test "x$FREEBSD" = "x0"],

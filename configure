@@ -596,6 +596,11 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+USE_WAYLAND_IM_FALSE
+USE_WAYLAND_IM_TRUE
+WAYLAND_SCANNER
+WAYLAND_IM_LIBS
+WAYLAND_IM_CFLAGS
 LAYER_SHELL_LIBS
 LAYER_SHELL_CFLAGS
 USE_UNITY_TRAY_FALSE
@@ -788,6 +793,7 @@ enable_anthy
 enable_chewing
 enable_appindicator
 enable_layer_shell
+enable_wayland_im
 '
       ac_precious_vars='build_alias
 host_alias
@@ -820,7 +826,10 @@ CHEWING_LIBS
 APPINDICATOR_CFLAGS
 APPINDICATOR_LIBS
 LAYER_SHELL_CFLAGS
-LAYER_SHELL_LIBS'
+LAYER_SHELL_LIBS
+WAYLAND_IM_CFLAGS
+WAYLAND_IM_LIBS
+WAYLAND_SCANNER'
 
 
 # Initialize some variables set by options.
@@ -1461,6 +1470,8 @@ Optional Features:
   --enable-appindicator   Enable Ubuntu Unity Tray, default is auto-detect
   --enable-layer-shell    Enable gtk-layer-shell windows on Wayland, default
                           is auto-detect
+  --enable-wayland-im     Enable the Wayland input method frontend, default is
+                          auto-detect
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1515,6 +1526,13 @@ Some influential environment variables:
               C compiler flags for LAYER_SHELL, overriding pkg-config
   LAYER_SHELL_LIBS
               linker flags for LAYER_SHELL, overriding pkg-config
+  WAYLAND_IM_CFLAGS
+              C compiler flags for WAYLAND_IM, overriding pkg-config
+  WAYLAND_IM_LIBS
+              linker flags for WAYLAND_IM, overriding pkg-config
+  WAYLAND_SCANNER
+              value of wayland_scanner for wayland-scanner, overriding
+              pkg-config
 
 Use these variables to override the choices made by 'configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -6694,6 +6712,151 @@ fi
 
 
 fi
+# WAYLAND_IM: the daemon as a Wayland input method (input-method-v2), when
+# it runs on GDK's Wayland backend, i.e. with layer-shell
+if test "x$enable_layer_shell" = "xyes"
+then :
+
+
+pkg_failed=no
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for wayland-client xkbcommon gtk+-wayland-3.0" >&5
+printf %s "checking for wayland-client xkbcommon gtk+-wayland-3.0... " >&6; }
+
+if test -n "$WAYLAND_IM_CFLAGS"; then
+    pkg_cv_WAYLAND_IM_CFLAGS="$WAYLAND_IM_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"wayland-client xkbcommon gtk+-wayland-3.0\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "wayland-client xkbcommon gtk+-wayland-3.0") 2>&5
+  ac_status=$?
+  printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_WAYLAND_IM_CFLAGS=`$PKG_CONFIG --cflags "wayland-client xkbcommon gtk+-wayland-3.0" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$WAYLAND_IM_LIBS"; then
+    pkg_cv_WAYLAND_IM_LIBS="$WAYLAND_IM_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"wayland-client xkbcommon gtk+-wayland-3.0\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "wayland-client xkbcommon gtk+-wayland-3.0") 2>&5
+  ac_status=$?
+  printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_WAYLAND_IM_LIBS=`$PKG_CONFIG --libs "wayland-client xkbcommon gtk+-wayland-3.0" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+                WAYLAND_IM_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "wayland-client xkbcommon gtk+-wayland-3.0" 2>&1`
+        else
+                WAYLAND_IM_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "wayland-client xkbcommon gtk+-wayland-3.0" 2>&1`
+        fi
+        # Put the nasty error message in config.log where it belongs
+        echo "$WAYLAND_IM_PKG_ERRORS" >&5
+
+        wayland_im_is_installed=no
+
+elif test $pkg_failed = untried; then
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+        wayland_im_is_installed=no
+
+else
+        WAYLAND_IM_CFLAGS=$pkg_cv_WAYLAND_IM_CFLAGS
+        WAYLAND_IM_LIBS=$pkg_cv_WAYLAND_IM_LIBS
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf '%s\n' "yes" >&6; }
+        wayland_im_is_installed=yes
+fi
+
+if test -n "$WAYLAND_SCANNER"; then
+    pkg_cv_WAYLAND_SCANNER="$WAYLAND_SCANNER"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"wayland-scanner\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "wayland-scanner") 2>&5
+  ac_status=$?
+  printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_WAYLAND_SCANNER=`$PKG_CONFIG --variable="wayland_scanner" "wayland-scanner" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+WAYLAND_SCANNER=$pkg_cv_WAYLAND_SCANNER
+
+if test "x$WAYLAND_SCANNER" = x""
+then :
+
+fi
+    if test -z "$WAYLAND_SCANNER"
+then :
+  wayland_im_is_installed=no
+fi
+
+else case e in #(
+  e) wayland_im_is_installed=no
+ ;;
+esac
+fi
+# Check whether --enable-wayland-im was given.
+if test ${enable_wayland_im+y}
+then :
+  enableval=$enable_wayland_im; enable_wayland_im=$enableval
+else case e in #(
+  e) enable_wayland_im=$wayland_im_is_installed
+ ;;
+esac
+fi
+
+if test "x$enable_wayland_im" = "xyes"
+then :
+
+    if test "x$wayland_im_is_installed" = "xno"
+then :
+  as_fn_error $? "Require layer-shell support, xkbcommon and wayland-scanner" "$LINENO" 5
+
+fi
+    GTKINC="$GTKINC $WAYLAND_IM_CFLAGS -DHIME_WAYLAND_IM=1"
+
+    GTKLDFLAGS="$GTKLDFLAGS $WAYLAND_IM_LIBS"
+
+
+
+fi
+ if test "x$enable_wayland_im" = "xyes"; then
+  USE_WAYLAND_IM_TRUE=
+  USE_WAYLAND_IM_FALSE='#'
+else
+  USE_WAYLAND_IM_TRUE='#'
+  USE_WAYLAND_IM_FALSE=
+fi
+
 LDFLAGS+=" $GTKLDFLAGS"
 if test "x$FREEBSD" = "x0"
 then :
@@ -7043,6 +7206,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${USE_UNITY_TRAY_TRUE}" && test -z "${USE_UNITY_TRAY_FALSE}"; then
   as_fn_error $? "conditional \"USE_UNITY_TRAY\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${USE_WAYLAND_IM_TRUE}" && test -z "${USE_WAYLAND_IM_FALSE}"; then
+  as_fn_error $? "conditional \"USE_WAYLAND_IM\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

@@ -161,6 +161,26 @@ endif
 
 CFLAGS     += -DHIME_I18N_MESSAGE=1
 
+# The daemon as a Wayland input method: client code generated from the
+# protocols in protocol/.
+if USE_WAYLAND_IM
+WL_PROTOCOLS = input-method-unstable-v2 virtual-keyboard-unstable-v1
+WL_PROTOCOL_H = $(WL_PROTOCOLS:%=%-client-protocol.h)
+OBJS       += wl-im.o $(WL_PROTOCOLS:%=%-protocol.o)
+endif
+
+%-client-protocol.h: protocol/%.xml
+	$(WAYLAND_SCANNER) client-header $< $@
+%-protocol.c: protocol/%.xml
+	$(WAYLAND_SCANNER) private-code $< $@
+
+# Before the first build there are no .d files to tell make that wl-im.c
+# includes the generated headers.
+wl-im.o: $(WL_PROTOCOL_H)
+
+# keep the generated protocol code between builds
+.SECONDARY: $(WL_PROTOCOLS:%=%-protocol.c)
+
 hime_tsin_o = tsin.o tsin-util.o win0.o win1.o tsin-parse.o
 OBJS       += $(hime_tsin_o)
 
@@ -415,7 +435,8 @@ clean:
 	@rm -f *.o *.d *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
 		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
-		$(GTK3_IM_TEST) $(GTK4_IM_TEST)
+		$(GTK3_IM_TEST) $(GTK4_IM_TEST) \
+		*-client-protocol.h *-protocol.c
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;
 
 # Rebuild objects when a header they include changes: the compiler writes
