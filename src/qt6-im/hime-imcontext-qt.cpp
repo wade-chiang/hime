@@ -194,13 +194,10 @@ void QHimePlatformInputContext::reset () {
 
 void QHimePlatformInputContext::update (Qt::InputMethodQueries queries) {
     dbg ("QHimePlatformInputContext::update\n");
-    QObject *input = qApp->focusObject ();
-    if (!input)
-        return;
-
-    QInputMethodQueryEvent query (queries);
-    QGuiApplication::sendEvent (input, &query);
-
+    // Only the cursor rectangle is used, which Qt keeps up to date
+    // (cursorMoved () reads it).  No query of our own: Qt calls this while
+    // a text widget is in the middle of an edit (QPlainTextEdit crashed on
+    // it).
     if (queries & Qt::ImCursorRectangle) {
         cursorMoved ();
     }

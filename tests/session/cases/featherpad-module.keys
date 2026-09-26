@@ -1,0 +1,5 @@
+@program featherpad-check.sh
+@compositor sway
+# FeatherPad with the HIME Qt module: Qt asks the module to update in the
+# middle of an edit, where querying the editor again crashed it.
+b 1 a <space> c 2
