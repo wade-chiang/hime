@@ -1,0 +1,3 @@
+@compositor sway
+@program daemon-backend.sh
+# On sway, which has layer-shell, the daemon picks Wayland by itself.

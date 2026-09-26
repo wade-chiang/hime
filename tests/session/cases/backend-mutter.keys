@@ -1,0 +1,2 @@
+@program daemon-backend.sh
+# On mutter, which has no layer-shell, the daemon picks X11 by itself.

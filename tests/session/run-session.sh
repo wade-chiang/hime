@@ -13,7 +13,7 @@
 #
 # The daemon's config can be adjusted with HIME_CONF="name=value ..."
 #
-# With HIME_SESSION_DAEMON_BACKEND=wayland the daemon runs on GDK's Wayland
+# With HIME_SESSION_DAEMON_BACKEND=wayland the daemon is forced onto GDK's Wayland
 # backend with no X display at all.
 #
 # With HIME_SESSION_COMPOSITOR=sway the session is a headless sway instead:
@@ -74,7 +74,6 @@ if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
     # private XDG_RUNTIME_DIR); there is no swaybg for the background
     WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
         WLR_RENDERER=pixman sway -c "$tmp/sway.config" >"$log" 2>&1 &
-    HIME_SESSION_DAEMON_BACKEND=wayland
 else
     mutter --headless --wayland --wayland-display=wl-hime-test \
         --virtual-monitor 1280x800 >"$log" 2>&1 &
@@ -128,16 +127,16 @@ x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1 || 
 
 # The daemon still needs X for its windows; it picks the X11 backend
 # itself, which run-session.sh relies on by not setting GDK_BACKEND.
-# HIME_DAEMON makes it daemonize, as when a client starts it.
+# HIME_DAEMON makes it daemonize, as when a client starts it.  It sees the
+# session as a desktop would show it (Wayland, plus X on mutter) and picks
+# its backend itself: X11 on mutter, Wayland on sway, which has layer-shell.
+daemon_env=(WAYLAND_DISPLAY="$wl_display" HIME_DAEMON=1 HIME_TABLE_DIR="$top/data")
 if [[ "${HIME_SESSION_DAEMON_BACKEND:-}" == wayland ]]; then
-    env -u DISPLAY WAYLAND_DISPLAY="$wl_display" HIME_BACKEND=wayland HIME_DAEMON=1 \
-        HIME_TABLE_DIR="$top/data" \
-        "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
-else
-    DISPLAY="$x_display" XAUTHORITY="$x_auth" HIME_DAEMON=1 \
-        HIME_TABLE_DIR="$top/data" \
-        "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
+    daemon_env+=(HIME_BACKEND=wayland)
+elif [[ -n "$x_display" ]]; then
+    daemon_env+=(DISPLAY="$x_display" XAUTHORITY="$x_auth")
 fi
+env -u DISPLAY "${daemon_env[@]}" "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
 
 if ! wait_for '[[ -S "$XDG_RUNTIME_DIR/hime/hime.socket" ]]'; then
     echo "run-session.sh: hime did not open its socket" >&2

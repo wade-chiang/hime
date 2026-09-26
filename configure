@@ -6593,19 +6593,19 @@ if test "x$with_gtk" = "x3.0"
 then :
 
 pkg_failed=no
-{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for gtk-layer-shell-0 >= 0.6" >&5
-printf %s "checking for gtk-layer-shell-0 >= 0.6... " >&6; }
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for gtk-layer-shell-0 >= 0.6 wayland-client" >&5
+printf %s "checking for gtk-layer-shell-0 >= 0.6 wayland-client... " >&6; }
 
 if test -n "$LAYER_SHELL_CFLAGS"; then
     pkg_cv_LAYER_SHELL_CFLAGS="$LAYER_SHELL_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gtk-layer-shell-0 >= 0.6\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "gtk-layer-shell-0 >= 0.6") 2>&5
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gtk-layer-shell-0 >= 0.6 wayland-client\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gtk-layer-shell-0 >= 0.6 wayland-client") 2>&5
   ac_status=$?
   printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_LAYER_SHELL_CFLAGS=`$PKG_CONFIG --cflags "gtk-layer-shell-0 >= 0.6" 2>/dev/null`
+  pkg_cv_LAYER_SHELL_CFLAGS=`$PKG_CONFIG --cflags "gtk-layer-shell-0 >= 0.6 wayland-client" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -6617,12 +6617,12 @@ if test -n "$LAYER_SHELL_LIBS"; then
     pkg_cv_LAYER_SHELL_LIBS="$LAYER_SHELL_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gtk-layer-shell-0 >= 0.6\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "gtk-layer-shell-0 >= 0.6") 2>&5
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"gtk-layer-shell-0 >= 0.6 wayland-client\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "gtk-layer-shell-0 >= 0.6 wayland-client") 2>&5
   ac_status=$?
   printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_LAYER_SHELL_LIBS=`$PKG_CONFIG --libs "gtk-layer-shell-0 >= 0.6" 2>/dev/null`
+  pkg_cv_LAYER_SHELL_LIBS=`$PKG_CONFIG --libs "gtk-layer-shell-0 >= 0.6 wayland-client" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -6643,9 +6643,9 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-                LAYER_SHELL_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "gtk-layer-shell-0 >= 0.6" 2>&1`
+                LAYER_SHELL_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "gtk-layer-shell-0 >= 0.6 wayland-client" 2>&1`
         else
-                LAYER_SHELL_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "gtk-layer-shell-0 >= 0.6" 2>&1`
+                LAYER_SHELL_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "gtk-layer-shell-0 >= 0.6 wayland-client" 2>&1`
         fi
         # Put the nasty error message in config.log where it belongs
         echo "$LAYER_SHELL_PKG_ERRORS" >&5
@@ -6684,7 +6684,7 @@ then :
 
     if test "x$layer_shell_is_installed" = "xno"
 then :
-  as_fn_error $? "Require GTK 3 and gtk-layer-shell (>= 0.6) installed" "$LINENO" 5
+  as_fn_error $? "Require GTK 3, gtk-layer-shell (>= 0.6) and wayland-client installed" "$LINENO" 5
 
 fi
     GTKINC="$GTKINC $LAYER_SHELL_CFLAGS -DHIME_LAYER_SHELL=1"

@@ -463,7 +463,7 @@ AS_IF(
   [test "x$with_gtk" = "x3.0"],
   [PKG_CHECK_MODULES(
     [LAYER_SHELL],
-    [gtk-layer-shell-0 >= 0.6],
+    [gtk-layer-shell-0 >= 0.6 wayland-client],
     [layer_shell_is_installed=yes],
     [layer_shell_is_installed=no]
   )],
@@ -480,7 +480,7 @@ AS_IF(
   [
     AS_IF(
       [test "x$layer_shell_is_installed" = "xno"],
-      [AC_MSG_ERROR([Require GTK 3 and gtk-layer-shell (>= 0.6) installed])]
+      [AC_MSG_ERROR([Require GTK 3, gtk-layer-shell (>= 0.6) and wayland-client installed])]
     )
     AC_SUBST([GTKINC], ["$GTKINC $LAYER_SHELL_CFLAGS -DHIME_LAYER_SHELL=1"])
     AC_SUBST([GTKLDFLAGS], ["$GTKLDFLAGS $LAYER_SHELL_LIBS"])

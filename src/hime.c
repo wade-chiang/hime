@@ -577,6 +577,59 @@ static void screen_size_changed (GdkScreen *screen, gpointer user_data) {
 
 #include "lang.h"
 
+#if HIME_LAYER_SHELL
+#include <wayland-client.h>
+
+static void registry_global (void *data, struct wl_registry *registry,
+                             uint32_t name, const char *interface, uint32_t version) {
+    if (!strcmp (interface, "zwlr_layer_shell_v1")) {
+        *(gboolean *) data = TRUE;
+    }
+}
+
+static void registry_global_remove (void *data, struct wl_registry *registry, uint32_t name) {
+}
+
+// Does the Wayland compositor we run under support wlr-layer-shell?
+static gboolean wayland_has_layer_shell (void) {
+    struct wl_display *display = wl_display_connect (NULL);
+    if (!display) {
+        return FALSE;
+    }
+
+    static const struct wl_registry_listener listener = {
+        registry_global,
+        registry_global_remove,
+    };
+    gboolean found = FALSE;
+    struct wl_registry *registry = wl_display_get_registry (display);
+    wl_registry_add_listener (registry, &listener, &found);
+    wl_display_roundtrip (display);
+    wl_registry_destroy (registry);
+    wl_display_disconnect (display);
+    return found;
+}
+#endif
+
+// The GDK backend: X11, whose windows can be placed anywhere and which
+// XIM needs, unless the Wayland compositor supports layer-shell, which lets
+// the daemon's windows keep their place and stay out of the keyboard focus
+// without Xwayland (niri, sway, KDE, ...).  HIME_BACKEND=x11|wayland
+// overrides this.
+static const char *choose_backend (void) {
+    const char *backend = getenv ("HIME_BACKEND");
+    if (backend && (!strcmp (backend, "x11") || !strcmp (backend, "wayland"))) {
+        return backend;
+    }
+
+#if HIME_LAYER_SHELL
+    if (wayland_has_layer_shell ()) {
+        return "wayland";
+    }
+#endif
+    return "x11";
+}
+
 int main (int argc, char **argv) {
     // Daemonize before gtk_init: GTK starts GLib worker threads (GDBus), and
     // a child forked after that only has the main thread, so it hangs on the
@@ -591,12 +644,12 @@ int main (int argc, char **argv) {
     }
 
 #if GTK_CHECK_VERSION(3, 10, 0)
-    // The daemon's windows and XIM still need X11; on a Wayland desktop run
-    // on Xwayland even when started from a native Wayland client.
-    // HIME_BACKEND=wayland runs it on the Wayland backend instead, without
-    // XIM or anything else that needs an X display.
-    const char *backend = getenv ("HIME_BACKEND");
-    gdk_set_allowed_backends (backend && !strcmp (backend, "wayland") ? "wayland" : "x11");
+    // GDK_BACKEND, inherited from the application that started the daemon,
+    // would override the choice
+    unsetenv ("GDK_BACKEND");
+    const char *backend = choose_backend ();
+    fprintf (stderr, "hime: using the %s backend\n", backend);
+    gdk_set_allowed_backends (backend);
 #endif
     gtk_init (&argc, &argv);
 

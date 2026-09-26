@@ -178,9 +178,8 @@ static gboolean start_hime_server (void) {
 
     if (pid == 0) {
         setenv ("HIME_DAEMON", "", TRUE);
-        // the daemon needs X11 even when started from a Wayland client
-        // that sets GDK_BACKEND=wayland
-        setenv ("GDK_BACKEND", "x11", TRUE);
+        // the daemon picks its GDK backend itself
+        unsetenv ("GDK_BACKEND");
 
         // do not hold the application's stdio open, e.g. a pipe the caller
         // waits on
