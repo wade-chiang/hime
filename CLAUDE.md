@@ -122,10 +122,21 @@ keeping HIME's own UI and typing feel. Phases:
    it: the daemon exports no symbols). Session tests cover the intcode,
    chewing and anthy modules (`@method`). The intcode module logs two
    pre-existing Gtk-CRITICALs (present/show on a NULL window) on X11 too.
-3. `zwp_input_method_v2` + popup surface frontend (niri, sway, Hyprland,
-   labwc/Xfce), for OverSpot. Drawing into a popup surface may need the
-   candidate UI separated from its GTK windows; the harness's stub list
-   (everything `harness.c` replaces from `win-gtab.c`) is that seam.
+3. `zwp_input_method_v2` frontend (niri, sway, Hyprland, labwc/Xfce).
+   3a done: `src/wl-im.c`, on GDK's own connection (the compositor only
+   lets the IM's own virtual keyboard past the grab). It grabs the
+   keyboard only while active (a grab gets all keys, also those of
+   applications with a HIME module), feeds ProcessKeyPress/Release,
+   commits `output_buffer` and the preedit with every change (text-input
+   state is double-buffered: an unsent preedit is cleared), forwards
+   unhandled keys through a `zwp_virtual_keyboard_v1` with the grab's
+   keymap, repeats held keys it handles, bypasses password/PIN fields, and
+   plugs into `hime_notify_ready/send` for mouse actions. All text-input
+   applications share one static ClientState. Session tests type real
+   keys with `tests/session/wl-type` into `*-text-input-test` in headless
+   sway. 3b (next): OverSpot as `zwp_input_popup_surface_v2`; a GTK
+   window can only get that role if gtk-layer-shell never touched it, so
+   switching styles means recreating the input windows.
 4. `zwp_input_method_v1` frontend (KDE/KWin).
 5. IBus-compatible frontend plus a GNOME Shell extension (GNOME/Mutter).
 
@@ -193,6 +204,19 @@ Known gaps after phase 1 (from review, not fixed yet):
   itself (`wayland-N`, ignoring `WAYLAND_DISPLAY`), its IPC socket path
   must fit in `sun_path` (keep `XDG_RUNTIME_DIR` short, e.g. mktemp), and
   there is no swaybg, so layer checks compare against a far-away pixel.
+- GDK dispatches Wayland events re-entrantly while a window is shown
+  (e.g. HIME's window popping up on a key press): `src/wl-im.c` queues
+  grab and input method events and handles them one at a time.
+- wlroots routes the keys of any virtual keyboard except the input
+  method's own through the grab, so `wl-type` can drive headless sway;
+  niri sends virtual keyboard keys around the grab, so it cannot be
+  tested that way.
+- GTK 3's `wayland` IM module is in the system module cache: a session
+  with `GTK_IM_MODULE_FILE` pointing at HIME's cache only does not find
+  it (`text-input-test.c` unsets it).
+- In gtab, the keys typed only show in the application's preedit with
+  `hime-on-the-spot-key=1`; otherwise they stay in HIME's window, and the
+  preedit only holds the phrase buffer (phrase mode).
 - On niri, `niri msg -j layers` shows the daemon's surfaces (namespace
   `hime`, Overlay, keyboard interactivity None). A test daemon can run in
   the user's live session without touching theirs: private
