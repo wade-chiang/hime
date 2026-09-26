@@ -1,0 +1,6 @@
+b        eat 
+<space>  eat  commit="測試二"
+@wait    commit=""
+module=QHimePlatformInputContext
+platform=wayland
+focus=yes

@@ -26,12 +26,14 @@
  *   KEY is a single printable character or one of <space> <enter> <bs>
  *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).
  *   @wait MS runs the main loop for MS, then prints what the module
- *   committed meanwhile (notifications) and its preedit.
+ *   committed meanwhile (notifications) and its preedit.  @sleep MS
+ *   waits without running the main loop.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <gtk/gtk.h>
 
@@ -39,6 +41,22 @@ static GString *commits;
 
 static void on_commit (GtkIMContext *context, const char *str, gpointer data) {
     g_string_append (commits, str);
+}
+
+// notify-check.sh: create $HIME_TEST_READY once waiting, so that it starts
+// its actions; stop waiting when it creates $HIME_TEST_DONE.
+static void signal_ready (void) {
+    const char *ready = getenv ("HIME_TEST_READY");
+    if (ready) {
+        FILE *f = fopen (ready, "w");
+        if (f)
+            fclose (f);
+    }
+}
+
+static int test_done (void) {
+    const char *done = getenv ("HIME_TEST_DONE");
+    return done && access (done, F_OK) == 0;
 }
 
 static guint parse_key (const char *tok, GdkModifierType *state) {
@@ -160,14 +178,23 @@ int main (int argc, char **argv) {
 
     int i;
     for (i = 1; i < argc; i++) {
+        if (!strcmp (argv[i], "@sleep") && i + 1 < argc) {
+            signal_ready ();
+            g_usleep (atoi (argv[++i]) * 1000);
+            continue;
+        }
+
         if (!strcmp (argv[i], "@wait") && i + 1 < argc) {
             g_string_truncate (commits, 0);
+            signal_ready ();
             const gint64 end = g_get_monotonic_time () + atoi (argv[++i]) * 1000;
-            while (g_get_monotonic_time () < end) {
+            while (g_get_monotonic_time () < end && !test_done ()) {
                 while (g_main_context_iteration (NULL, FALSE))
                     ;
                 g_usleep (10000);
             }
+            while (g_main_context_iteration (NULL, FALSE))
+                ;
 
             char *preedit = NULL;
             gtk_im_context_get_preedit_string (context, &preedit, NULL, NULL);

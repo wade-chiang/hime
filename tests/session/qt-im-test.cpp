@@ -26,12 +26,14 @@
  *   KEY is a single printable character or one of <space> <enter> <bs>
  *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).
  *   @wait MS processes events for MS, then prints what the input context
- *   committed meanwhile (notifications).
+ *   committed meanwhile (notifications).  @sleep MS waits without
+ *   processing events.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <QtCore/QElapsedTimer>
 #include <QtGui/QGuiApplication>
@@ -42,6 +44,22 @@
 #include <QtGui/qpa/qplatforminputcontext.h>
 #include <QtGui/qpa/qplatformintegration.h>
 #include <QtGui/qpa/qwindowsysteminterface.h>
+
+// notify-check.sh: create $HIME_TEST_READY once waiting, so that it starts
+// its actions; stop waiting when it creates $HIME_TEST_DONE.
+static void signal_ready (void) {
+    const char *ready = getenv ("HIME_TEST_READY");
+    if (ready) {
+        FILE *f = fopen (ready, "w");
+        if (f)
+            fclose (f);
+    }
+}
+
+static int test_done (void) {
+    const char *done = getenv ("HIME_TEST_DONE");
+    return done && access (done, F_OK) == 0;
+}
 
 // A text field: accepts input methods and collects what they commit.
 class TextWindow : public QWindow {
@@ -144,13 +162,21 @@ int main (int argc, char **argv) {
     context->setFocusObject (&window);
 
     for (int i = 1; i < argc; i++) {
+        if (!strcmp (argv[i], "@sleep") && i + 1 < argc) {
+            signal_ready ();
+            usleep (atoi (argv[++i]) * 1000);
+            continue;
+        }
+
         if (!strcmp (argv[i], "@wait") && i + 1 < argc) {
             window.commits.clear ();
+            signal_ready ();
             QElapsedTimer timer;
             timer.start ();
             const int ms = atoi (argv[++i]);
-            while (timer.elapsed () < ms)
+            while (timer.elapsed () < ms && !test_done ())
                 app.processEvents (QEventLoop::AllEvents, 10);
+            app.processEvents (QEventLoop::AllEvents, 10);
             printf ("@wait    commit=\"%s\"\n", window.commits.toUtf8 ().constData ());
             continue;
         }

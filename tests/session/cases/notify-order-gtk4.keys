@@ -1,0 +1,6 @@
+@program notify-check.sh
+@env HIME_NOTIFY_HOOKS=commit 測試
+# A notification that arrives while the application is busy (@sleep) is
+# taken in with the reply to the next key: its text, older, must be
+# committed before the key's (二): 測試二.
+gtk4-im-test b @sleep 1500 <space>

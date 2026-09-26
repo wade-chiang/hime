@@ -1,0 +1,5 @@
+b        eat 
+<space>  eat  commit="測試二"
+@wait    commit="" preedit=""
+module=hime
+backend=GdkWaylandDisplay

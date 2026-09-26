@@ -14,15 +14,27 @@ here="$(cd "$(dirname "$0")" && pwd)"
 program="$1"
 shift
 
-"$here/$program" "$@" @wait 3000 &
+# PROGRAM creates HIME_TEST_READY when it starts waiting (after its keys,
+# and focused) and stops waiting when HIME_TEST_DONE exists
+export HIME_TEST_READY="$HIME_SESSION_TMP/notify-ready"
+export HIME_TEST_DONE="$HIME_SESSION_TMP/notify-done"
+rm -f "$HIME_TEST_READY" "$HIME_TEST_DONE"
+
+"$here/$program" "$@" @wait 10000 &
 client=$!
+
+for _ in $(seq 100); do
+    [[ -e "$HIME_TEST_READY" ]] && break
+    sleep 0.1
+done
 
 # the actions, separated by ";" (see hime_test_hook in src/eve.c)
 IFS=';' read -ra hooks <<<"${HIME_NOTIFY_HOOKS:-commit 測試;preedit}"
-sleep 1
 for hook in "${hooks[@]}"; do
-    "$here/hime-client-test" -m "#hime_test $hook"
-    sleep 0.3
+    env -u HIME_TEST_READY "$here/hime-client-test" -m "#hime_test $hook"
+    sleep 0.2
 done
+sleep 0.3
+touch "$HIME_TEST_DONE"
 
 wait "$client"

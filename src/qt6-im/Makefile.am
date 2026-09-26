@@ -85,7 +85,7 @@ uninstall:
 .PHONY: clean
 clean:
 	@echo "clean up"
-	@rm -f $(OBJS) *.d im-hime.so *~ core.* *moc*.cpp *.E .depend $(QT_IM_TEST)
+	@rm -f $(OBJS) *.d im-hime.so *~ core.* *moc*.cpp *.E .depend $(QT_IM_TEST) $(QT_IM_TEST).d
 	@rm -f moc_hime-qt.cpp moc_hime-imcontext-qt.cpp
 
 .depend:

@@ -1307,8 +1307,9 @@ void hime_test_hook (char *args) {
         force_preedit_shift ();
     } else if (!strncmp (args, "key ", 4) && args[4]) {
         // a virtual keyboard click
-        win_kbm_send_key (!strcmp (args + 4, "space") ? XK_space : (KeySym) args[4], TRUE);
-        win_kbm_send_key (!strcmp (args + 4, "space") ? XK_space : (KeySym) args[4], FALSE);
+        const KeySym key = !strcmp (args + 4, "space") ? XK_space : (unsigned char) args[4];
+        win_kbm_send_key (key, TRUE);
+        win_kbm_send_key (key, FALSE);
     }
 }
 

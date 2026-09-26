@@ -91,8 +91,26 @@ static HIME_client_handle *open_client (void) {
     return handle;
 }
 
+
+// notify-check.sh: create $HIME_TEST_READY once waiting, so that it starts
+// its actions; stop waiting when it creates $HIME_TEST_DONE.
+static void signal_ready (void) {
+    const char *ready = getenv ("HIME_TEST_READY");
+    if (ready) {
+        FILE *f = fopen (ready, "w");
+        if (f)
+            fclose (f);
+    }
+}
+
+static int test_done (void) {
+    const char *done = getenv ("HIME_TEST_DONE");
+    return done && access (done, F_OK) == 0;
+}
+
 static void wait_for_notifications (HIME_client_handle *handle, int ms) {
-    for (; ms > 0; ms -= 20) {
+    signal_ready ();
+    for (; ms > 0 && !test_done (); ms -= 20) {
         char *commit = NULL;
         if (hime_im_client_read_notify (handle, &commit)) {
             printf ("notify");
@@ -138,6 +156,7 @@ int main (int argc, char **argv) {
         }
 
         if (!strcmp (argv[argi], "@sleep") && argi + 1 < argc) {
+            signal_ready ();
             usleep (atoi (argv[++argi]) * 1000);
             continue;
         }
