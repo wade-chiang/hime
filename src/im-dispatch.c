@@ -100,8 +100,19 @@ static ssize_t write_enc (const int fd, const void *p, const size_t n) {
     return r;
 }
 
+// The connection of the field that last got the focus or typed a key, and
+// the state it used then: notifications go there.  Fields of one X window
+// share a state, which only its first connection owns.
+static int focus_fd = -1;
+static ClientState *focus_fd_cs;
+
 static void shutdown_client (const int fd) {
     const int idx = fd;
+
+    if (fd == focus_fd) {
+        focus_fd = -1;
+        focus_fd_cs = NULL;
+    }
 
     g_source_remove (hime_clients[idx].tag);
 
@@ -142,28 +153,24 @@ static void write_reply (HIME_reply *reply, const int fd) {
     }
 }
 
-// The connection of the current client, if it takes notifications; -1
-// otherwise.
+// The connection of the focused field, if it takes notifications; -1
+// otherwise, also when an XIM client got the focus since.  Not
+// current_CS's: that may be another field of the same X window, or a new
+// connection, which becomes current while it is set up.
 static int notify_fd (void) {
-    if (!current_CS || !current_CS->b_hime_protocol) {
+    if (focus_fd < 0 || !hime_clients[focus_fd].notify ||
+        focus_fd_cs != hime_focused_client ()) {
         return -1;
     }
-
-    int fd;
-    for (fd = 0; fd < hime_clientsN; fd++) {
-        if (hime_clients[fd].cs == current_CS && hime_clients[fd].notify) {
-            return fd;
-        }
-    }
-    return -1;
+    return focus_fd;
 }
 
-// Can text be committed to the current client without a key event from it?
+// Can text be committed to the focused client without a key event from it?
 gboolean hime_notify_ready (void) {
     return notify_fd () >= 0;
 }
 
-// Send the output buffer (text to commit, possibly none) to the current
+// Send the output buffer (text to commit, possibly none) to the focused
 // client, which then also refreshes its preedit.
 void hime_notify_send (void) {
     const int fd = notify_fd ();
@@ -375,11 +382,15 @@ void process_client_req (const int fd) {
     case HIME_req_key_press:
     case HIME_req_key_release:
         do_process_key (&req, &reply, fd, cs);
+        focus_fd = fd;
+        focus_fd_cs = cs;
         break;
 
     case HIME_req_focus_in:
         dbg_time ("HIME_req_focus_in  %x %d %d\n", cs, cs->spot_location.x, cs->spot_location.y);
         hime_FocusIn (cs);
+        focus_fd = fd;
+        focus_fd_cs = cs;
         break;
 
     case HIME_req_focus_out:

@@ -26,7 +26,8 @@
  *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).  @1 and @2 move the focus to the first or a second client
  *   connection (two text fields, both without an X window); @new closes
  *   the focused connection and focuses a new one in its place (an
- *   application quits, another starts).  @sleep MS waits, keeping the
+ *   application quits, another starts).  @win ID gives the focused
+ *   connection an X window id (fields of one X11 window share it).  @sleep MS waits, keeping the
  *   connection open.  @wait MS waits while taking notifications (text the
  *   daemon commits without a key event) and prints them.  -m sends a
  *   daemon message (as hime-setup does) first; with no keys after it the
@@ -124,6 +125,13 @@ int main (int argc, char **argv) {
     hime_im_client_focus_in (handle);
 
     for (; argi < argc; argi++) {
+        if (!strcmp (argv[argi], "@win") && argi + 1 < argc) {
+            hime_im_client_set_client_window (handle, strtoul (argv[++argi], NULL, 0));
+            // tell the daemon, as a field focused in that window would
+            hime_im_client_focus_in (handle);
+            continue;
+        }
+
         if (!strcmp (argv[argi], "@wait") && argi + 1 < argc) {
             wait_for_notifications (handle, atoi (argv[++argi]));
             continue;

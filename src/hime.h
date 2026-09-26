@@ -209,6 +209,7 @@ gboolean ProcessKeyRelease (KeySym keysym, uint32_t kev_state);
 int hime_FocusIn (ClientState *cs);
 int hime_FocusOut (ClientState *cs);
 void hime_forget_client (ClientState *cs);
+ClientState *hime_focused_client (void);
 gboolean hime_notify_ready (void);
 void hime_notify_send (void);
 void force_preedit_shift (void);

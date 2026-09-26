@@ -1280,16 +1280,17 @@ void hime_reset ();
 // the client that last got the focus, see hime_FocusIn
 static ClientState *focus_cs;
 
+ClientState *hime_focused_client (void) {
+    return focus_cs;
+}
+
 // Session tests (HIME_TEST_HOOKS) drive what mouse actions do, sent as
 // "#hime_test ACTION" messages: "commit TEXT" (as a symbol table click),
 // "preedit" (as a candidate click) and "key K" (a virtual keyboard key: a
-// character, or "space").  They act on the focused client,
-// not on the connection that sent the message.
+// character, or "space").  Like mouse actions, they reach the focused
+// client, not the connection that sent the message (which becomes
+// current_CS while it is set up).
 void hime_test_hook (char *args) {
-    if (focus_cs) {
-        current_CS = focus_cs;
-    }
-
     if (!strncmp (args, "commit ", 7)) {
         send_text_call_back (args + 7);
     } else if (!strcmp (args, "preedit")) {
