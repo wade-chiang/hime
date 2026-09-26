@@ -43,8 +43,10 @@ class QHimePlatformInputContext : public QPlatformInputContext {
     // watch on the daemon connection for notifications
     QSocketNotifier *notifier = nullptr;
     int notifier_fd = 0;
+    bool pending_queued = false;
     void watch_notifications ();
     void handle_notifications ();
+    void queue_pending_notifications ();
     void send_event (QInputMethodEvent &e);
     void update_preedit ();
     void cursorMoved ();

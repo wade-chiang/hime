@@ -107,7 +107,7 @@ void QHimePlatformInputContext::watch_notifications () {
         notifier = nullptr;
     }
 
-    if (fd > 0 && hime_ch->notify_ok) {
+    if (fd > 0 && hime_im_client_notify_ok (hime_ch)) {
         notifier = new QSocketNotifier (fd, QSocketNotifier::Read, this);
         notifier_fd = fd;
         QObject::connect (notifier, &QSocketNotifier::activated, this,
@@ -118,14 +118,30 @@ void QHimePlatformInputContext::watch_notifications () {
 // Hand out the notifications received, whether through the watch or while
 // waiting for another reply.
 void QHimePlatformInputContext::handle_notifications () {
+    // the preedit refresh may take in another one
     char *commit = NULL;
-    if (hime_ch && hime_im_client_read_notify (hime_ch, &commit)) {
+    while (hime_ch && hime_im_client_read_notify (hime_ch, &commit)) {
         if (commit) {
             send_str (commit);  // frees it
         }
         update_preedit ();
     }
     watch_notifications ();
+}
+
+// After a request: notifications it took in before its reply are no longer
+// on the connection, so the notifier would not report them.
+void QHimePlatformInputContext::queue_pending_notifications () {
+    if (pending_queued || !hime_im_client_notify_pending (hime_ch)) {
+        return;
+    }
+    pending_queued = true;
+    QMetaObject::invokeMethod (
+        this, [this] () {
+            pending_queued = false;
+            handle_notifications ();
+        },
+        Qt::QueuedConnection);
 }
 
 QHimePlatformInputContext::~QHimePlatformInputContext () {
@@ -209,6 +225,7 @@ void QHimePlatformInputContext::setFocusObject (QObject *object) {
         } else {
             dbg ("no str in preedit\n");
         }
+        queue_pending_notifications ();
         return;
     }
 
@@ -270,6 +287,7 @@ void QHimePlatformInputContext::update_preedit () {
 
     int ret;
     hime_im_client_set_flags (hime_ch, FLAG_HIME_client_handle_use_preedit, &ret);
+    queue_pending_notifications ();
 
     QObject *input = qApp->focusObject ();
 
@@ -332,6 +350,9 @@ bool QHimePlatformInputContext::send_key_press (quint32 keysym, quint32 state) {
     dbg ("send_key_press\n");
     char *rstr = NULL;
     int result = hime_im_client_forward_key_press (hime_ch, keysym, state, &rstr);
+
+    // notifications that came before this reply are older than its text
+    handle_notifications ();
 
     if (rstr) {
         send_str (rstr);

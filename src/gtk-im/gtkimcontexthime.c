@@ -49,6 +49,8 @@ struct _GtkIMContextHIME {
     // watch on the daemon connection for notifications
     guint notify_source;
     int notify_fd;
+    // hands out notifications taken in while waiting for another reply
+    guint pending_source;
 
     // preedit
     char *pe_str;
@@ -172,6 +174,7 @@ gtk_im_context_hime_init (GtkIMContextHIME *im_context_hime) {
     im_context_hime->hime_ch = NULL;
     im_context_hime->notify_source = 0;
     im_context_hime->notify_fd = 0;
+    im_context_hime->pending_source = 0;
     init_preedit (im_context_hime);
 }
 
@@ -203,6 +206,10 @@ static void gtk_im_context_hime_finalize (GObject *obj) {
     if (context_xim->notify_source) {
         g_source_remove (context_xim->notify_source);
         context_xim->notify_source = 0;
+    }
+    if (context_xim->pending_source) {
+        g_source_remove (context_xim->pending_source);
+        context_xim->pending_source = 0;
     }
 
     if (context_xim->hime_ch) {
@@ -335,34 +342,55 @@ static void update_preedit_from_notification (GtkIMContextHIME *context_xim) {
 // Hand out the notifications received, whether through the watch or while
 // waiting for another reply.
 static void handle_notifications (GtkIMContextHIME *context_xim) {
+    // the preedit refresh may take in another one
     char *commit = NULL;
-    if (!context_xim->hime_ch || !hime_im_client_read_notify (context_xim->hime_ch, &commit)) {
-        return;
+    while (context_xim->hime_ch && hime_im_client_read_notify (context_xim->hime_ch, &commit)) {
+        if (commit) {
+            g_signal_emit_by_name (context_xim, "commit", commit);
+            free (commit);
+        }
+        update_preedit_from_notification (context_xim);
     }
+}
 
-    if (commit) {
-        g_signal_emit_by_name (context_xim, "commit", commit);
-        free (commit);
+static gboolean cb_pending (gpointer data) {
+    GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (data);
+    context_xim->pending_source = 0;
+    handle_notifications (context_xim);
+    return G_SOURCE_REMOVE;
+}
+
+// After a request: notifications it took in before its reply are no longer
+// on the connection, so the watch would not report them.
+static void queue_pending_notifications (GtkIMContextHIME *context_xim) {
+    if (!context_xim->pending_source && hime_im_client_notify_pending (context_xim->hime_ch)) {
+        context_xim->pending_source = g_idle_add (cb_pending, context_xim);
     }
-    update_preedit_from_notification (context_xim);
 }
 
 static void watch_notifications (GtkIMContextHIME *context_xim);
 
 static gboolean cb_notification (gint fd, GIOCondition condition, gpointer data) {
     GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (data);
+    const guint source = context_xim->notify_source;
 
+    // a commit handler may destroy the widget, and the context with it
+    g_object_ref (context_xim);
     handle_notifications (context_xim);
 
+    gboolean keep = context_xim->notify_source == source;
     // the connection closed or was reopened on another fd
-    if (condition & (G_IO_HUP | G_IO_ERR) ||
-        hime_im_client_get_fd (context_xim->hime_ch) != fd) {
+    if (keep && (condition & (G_IO_HUP | G_IO_ERR) ||
+                 hime_im_client_get_fd (context_xim->hime_ch) != fd)) {
         context_xim->notify_source = 0;
         context_xim->notify_fd = 0;
         watch_notifications (context_xim);
-        return G_SOURCE_REMOVE;
+        keep = FALSE;
     }
-    return G_SOURCE_CONTINUE;
+    g_object_unref (context_xim);
+
+    // a handler may already have replaced this watch
+    return keep ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
 }
 
 // Watch the daemon connection, following reconnections.
@@ -381,7 +409,7 @@ static void watch_notifications (GtkIMContextHIME *context_xim) {
         context_xim->notify_source = 0;
     }
 
-    if (fd > 0 && context_xim->hime_ch->notify_ok) {
+    if (fd > 0 && hime_im_client_notify_ok (context_xim->hime_ch)) {
         context_xim->notify_source = g_unix_fd_add (fd, G_IO_IN | G_IO_HUP | G_IO_ERR,
                                                     cb_notification, context_xim);
         context_xim->notify_fd = fd;
@@ -440,6 +468,8 @@ static void gtk_im_context_hime_get_preedit_string (
             add_preedit_attr (*attrs, *str, &(context_hime->pe_attr[i]));
         }
     }
+
+    queue_pending_notifications (context_hime);
 }
 
 #if GTK_CHECK_VERSION(4, 0, 0)
@@ -490,6 +520,9 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
         result = hime_im_client_forward_key_release (context_xim->hime_ch,
                                                      keysym, state, &result_str);
     }
+
+    // notifications that came before this reply are older than its text
+    handle_notifications (context_xim);
 
     char *preedit_str = NULL;
     HIME_PREEDIT_ATTR attr[HIME_PREEDIT_ATTR_MAX_N];
@@ -618,6 +651,8 @@ static void gtk_im_context_hime_focus_out (GtkIMContext *context) {
             free (result_str);
         }
     }
+
+    queue_pending_notifications (context_xim);
 }
 
 static void gtk_im_context_hime_set_cursor_location (GtkIMContext *context,
@@ -653,6 +688,8 @@ static void gtk_im_context_hime_set_cursor_location (GtkIMContext *context,
     if (context_xim->hime_ch) {
         hime_im_client_set_cursor_location (context_xim->hime_ch, x, y);
     }
+
+    queue_pending_notifications (context_xim);
 }
 
 static void gtk_im_context_hime_set_use_preedit (GtkIMContext *context,
@@ -672,6 +709,8 @@ static void gtk_im_context_hime_set_use_preedit (GtkIMContext *context,
         hime_im_client_clear_flags (context_hime->hime_ch,
                                     FLAG_HIME_client_handle_use_preedit, &ret);
     }
+
+    queue_pending_notifications (context_hime);
 }
 
 static void gtk_im_context_hime_reset (GtkIMContext *context) {
@@ -682,6 +721,8 @@ static void gtk_im_context_hime_reset (GtkIMContext *context) {
         clear_preedit (context_hime);
         g_signal_emit_by_name (context, "preedit-changed");
     }
+
+    queue_pending_notifications (context_hime);
 }
 
 /*
