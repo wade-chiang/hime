@@ -13,12 +13,13 @@
 - 在支援 layer-shell 的合成器上（niri、sway、Hyprland、KDE 等），HIME 主程式直接跑在 Wayland 上，視窗以 layer-shell 顯示：固定在設定的位置、不會搶走鍵盤焦點，不需要 Xwayland。
 - 在 GNOME 等沒有 layer-shell 的桌面上，HIME 主程式與它的視窗跑在 Xwayland 上。
 - 在支援 input-method-v2 的合成器上（niri、sway、Hyprland 等），HIME 主程式同時是 Wayland 的輸入法：使用 text-input 協定的程式不需要 HIME 的 IM module 也能用 HIME 輸入，例如 foot、GTK 4 與 Qt 6 程式（未設定 IM module 時）、GTK 3 程式（`GTK_IM_MODULE=wayland`）、Firefox、Chromium（加上 `--enable-wayland-ime`）。
+- 在 KDE Plasma 上，HIME 可以作為 KWin 的輸入法（input-method-v1）：在「系統設定 → 鍵盤 → 虛擬鍵盤」選擇 HIME，由 KWin 啟動 HIME；使用 text-input 的程式同樣不需要 HIME 的 IM module。
 - 啟動時自動選擇；可用 `HIME_BACKEND=x11` 或 `HIME_BACKEND=wayland` 強制指定。
 - 以固定位置的輸入視窗（外觀設定 → 固定輸入視窗位置）為主。
 
 驗證範圍：
 
-- 自動測試：`make check-session`，在 headless mutter 或 sway 中以模擬按鍵輸入；sway 中另以截圖檢查 layer-shell 視窗的位置。
+- 自動測試：`make check-session`，在 headless mutter、sway 或 KWin 中以模擬按鍵輸入；sway 與 KWin 中另以截圖檢查輸入視窗的位置。
 - 真實桌面測試程式：同樣的測試程式，在實際登入的桌面中，以已安裝的套件與嘸蝦米字根表輸入。
 - 實際使用：在真實程式中手動打字。
 
@@ -33,12 +34,12 @@ HIME 作為 Wayland 輸入法（text-input 程式，不經 HIME module）：
 
 | 程式 | 自動測試 | 實際使用 |
 |---|---|---|
-| GTK 3（`GTK_IM_MODULE=wayland`） | sway | 尚未 |
-| GTK 4 | sway | Ghostty（niri 26.04） |
-| Qt 6（`QT_IM_MODULE=wayland`） | sway | FeatherPad（niri 26.04） |
+| GTK 3（`GTK_IM_MODULE=wayland`） | sway、KWin 6.7 | 尚未 |
+| GTK 4 | sway、KWin 6.7 | Ghostty（niri 26.04） |
+| Qt 6（`QT_IM_MODULE=wayland`） | sway、KWin 6.7 | FeatherPad（niri 26.04） |
 | 其他 text-input 程式 | — | foot（niri 26.04） |
 
-以上三個程式在 niri 26.04 上也實測過「跟著游標」：HIME 的輸入視窗出現在文字游標下方。
+以上三個程式在 niri 26.04 上也實測過「跟著游標」：HIME 的輸入視窗出現在文字游標下方。KDE Plasma 尚未實機測試。
 
 ### 安裝
 
@@ -100,6 +101,14 @@ Ghostty 預設只跑一個程式實例：已經有 Ghostty 在執行時，用不
 
 同一時間只能有一個輸入法；若 fcitx5 或 IBus 已經佔用，HIME 會顯示「another Wayland input method is running」，只提供 IM module 的方式。設定 `HIME_NO_WAYLAND_IM=1` 可以關閉這個功能。
 
+#### KDE Plasma
+
+在「系統設定 → 鍵盤 → 虛擬鍵盤」選擇「HIME」。KWin 會啟動 HIME，並在 HIME 當掉時重新啟動它；若已經有 HIME 在執行（例如由 IM module 啟動），KWin 啟動的 HIME 會接手，已開的程式會自動重新連線。
+
+- 使用 text-input 的程式（GTK 3/4、Qt 6、foot 等）直接透過 KWin 輸入，「跟著游標」時輸入視窗出現在文字游標下方。
+- 設定 `GTK_IM_MODULE=hime`、`QT_IM_MODULE=hime` 的程式照舊透過 HIME 的 IM module 輸入，輸入視窗固定位置。若只想在 Plasma 中改走 text-input，可以把設定寫在 `~/.config/plasma-workspace/env/` 的腳本裡，不影響其他桌面。
+- Chromium、Electron 程式需加上 `--enable-wayland-ime --wayland-text-input-version=3`。
+
 ### 已知限制
 
 - 「跟著游標」的輸入視窗只在 text-input 程式中（HIME 作為 Wayland 輸入法時）跟著游標；透過 HIME IM module 的 Wayland 程式拿不到游標位置，視窗固定在「固定輸入視窗位置」所設定的座標。詞音的候選字視窗、符號表、新酷音與 Anthy 的視窗也固定在該位置。
@@ -108,7 +117,7 @@ Ghostty 預設只跑一個程式實例：已經有 Ghostty 在執行時，用不
 - 作為 Wayland 輸入法時，候選字等屬性（底線、反白）不會顯示在程式的預編輯文字中：協定不支援。
 - 作為 Wayland 輸入法時，焦點離開輸入欄位時尚未送出的字（例如詞音的整句）會被丟棄：協定不接受失去焦點後送出的文字。
 - 輸入法選單（在輸入視窗上按滑鼠中鍵）在 layer-shell 上尚未處理。
-- HIME 跑在 Wayland 上時不提供 XIM，沒有 GTK/Qt IM module 的純 X11 程式無法使用 HIME。
+- HIME 跑在 Wayland 上時（niri、KDE Plasma 等）不提供 XIM，沒有 GTK/Qt IM module 的純 X11 程式無法使用 HIME。
 - GTK 4 程式的 AltGr 修飾鍵不會傳給 HIME。
 - Chromium、Electron 程式在原生 Wayland 下尚未測試。
 

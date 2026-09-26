@@ -145,7 +145,20 @@ keeping HIME's own UI and typing feel. Phases:
    to the fixed position when win0 is a popup. Session tests take
    screenshots through `@exec popup-shot.sh` and switch styles with
    `set-style.sh`; `@method pho|tsin` exercises those windows.
-4. `zwp_input_method_v1` frontend (KDE/KWin).
+4. Done (awaiting a real Plasma test): KWin as input method through
+   `zwp_input_method_v1`. `src/wl-im.c` is the protocol-independent core
+   behind `WlImProtocol` (`src/wl-im-private.h`), with `src/wl-im-v2.c`
+   and `src/wl-im-v1.c`. KWin starts the IM itself (kwinrc
+   `[Wayland] InputMethod=`, `menu/hime-wayland.desktop` with
+   `X-KDE-Wayland-VirtualKeyboard`) and hands it `WAYLAND_SOCKET`, the only
+   connection offering the protocol: `hime_launched_by_compositor ()`
+   skips the layer-shell probe, stays in the foreground, and replaces a
+   running daemon (SO_PEERCRED + SIGTERM in `src/im-srv.c`). v1 comes as a
+   context per field (grab, commits, preedit, forwarded keys and echoed
+   modifiers go through it, with its commit_state serial); the OverSpot
+   window is an overlay input panel (one at a time). `@compositor kwin`
+   runs session tests in a headless KWin; `kwin-*` cases mirror
+   `wl-im-*`.
 5. IBus-compatible frontend plus a GNOME Shell extension (GNOME/Mutter).
 
 Both input window styles must work on Wayland and stay switchable at
@@ -212,6 +225,17 @@ Known gaps after phase 1 (from review, not fixed yet):
   itself (`wayland-N`, ignoring `WAYLAND_DISPLAY`), its IPC socket path
   must fit in `sun_path` (keep `XDG_RUNTIME_DIR` short, e.g. mktemp), and
   there is no swaybg, so layer checks compare against a far-away pixel.
+- Headless KWin for tests (`@compositor kwin`): `kwin_wayland --virtual
+  --inputmethod ...` starts the daemon; KWin has no virtual keyboard or
+  screencopy protocol, so `wl-type` uses `org_kde_kwin_fake_input` and
+  `kwin-shot.py` the ScreenShot2 D-Bus interface, both allowed by
+  `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1` and
+  `KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1`. Screenshots need OpenGL
+  compositing (not `KWIN_COMPOSE=Q`); a render node or llvmpipe does.
+  KWin places new windows centered: the text-input tests maximize theirs.
+- KWin 6.7 removed text-input-v1: Chromium/Electron need
+  `--enable-wayland-ime --wayland-text-input-version=3`. Qt 6 uses
+  text-input-v2 on KWin.
 - A popup surface's wl_surface must not be destroyed before its role:
   GtkWindow's unmap destroys it, and gtk-layer-shell overrides that class
   handler for every window, so signal handlers and emission hooks run too
