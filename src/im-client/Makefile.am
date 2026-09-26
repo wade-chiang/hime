@@ -105,9 +105,13 @@ util.o: ../util.c
 .PHONY: clean
 clean:
 	@echo "clean up"
-	rm -f *.o *.so *.so.* *~ *.E *.db tags core.* .depend
+	rm -f *.o *.d *.so *.so.* *~ *.E *.db tags core.* .depend
 
 .depend:
 	@echo "building $@ ..."
 	$(CCX) $(CPPFLAGS) $(CFLAGS) -MM *.c > $@
 
+# Rebuild objects when a header they include changes: the compiler writes
+# the dependencies of each object into a .d file next to it.
+CFLAGS += -MMD -MP
+-include $(wildcard *.d)

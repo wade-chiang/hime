@@ -1,6 +1,7 @@
 *.a
 *.gmo
 *.o
+*.d
 *.pico
 *.pot
 *.so

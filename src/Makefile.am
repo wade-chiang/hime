@@ -412,8 +412,13 @@ clean:
 	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im clean; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im clean; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im clean; fi
-	@rm -f *.o *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
+	@rm -f *.o *.d *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
 		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
 		$(GTK3_IM_TEST) $(GTK4_IM_TEST)
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;
+
+# Rebuild objects when a header they include changes: the compiler writes
+# the dependencies of each object into a .d file next to it.
+CFLAGS += -MMD -MP
+-include $(wildcard *.d)

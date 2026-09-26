@@ -44,4 +44,9 @@ uninstall:
 .PHONY: clean
 clean:
 	@echo "clean up"
-	@rm -f *.pico *.so *.o
+	@rm -f *.pico *.so *.o *.d
+
+# Rebuild objects when a header they include changes: the compiler writes
+# the dependencies of each object into a .d file next to it.
+CFLAGS += -MMD -MP
+-include $(wildcard *.d)
