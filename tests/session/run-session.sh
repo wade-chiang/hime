@@ -43,6 +43,8 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
         fi
     done
 
+    # The inner cleanup removes it: the exec below drops this trap, which
+    # only covers failures before that.
     tmp="$(mktemp -d)"
     trap 'rm -rf "$tmp"' EXIT
     mkdir -m 700 "$tmp/runtime"
@@ -76,6 +78,8 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     export XDG_RUNTIME_DIR="$tmp/runtime" HOME="$tmp/home"
     unset DISPLAY WAYLAND_DISPLAY XAUTHORITY
     export XMODIFIERS=@im=ibus
+    # no gvfs daemons, which would leave a gvfs directory behind
+    export GIO_USE_VFS=local
     exec dbus-run-session -- "$0" "$@"
 fi
 
@@ -113,6 +117,7 @@ cleanup() {
     kill $(hime_pids) 2>/dev/null || true
     kill "$mutter_pid" 2>/dev/null || true
     wait 2>/dev/null || true
+    rm -rf "$tmp" 2>/dev/null || true
 }
 trap cleanup EXIT
 
