@@ -224,6 +224,7 @@ all: $(PROGS) $(PROGS_SYM) $(DATA) $(PROGS_CV)
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im; fi
 	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im; fi
+	if [ $(IBUS_ENGINE) = 'Y' ]; then $(MAKE) -C ibus; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im; fi
 
@@ -307,7 +308,7 @@ $(WL_TYPE): ../tests/session/wl-type.c virtual-keyboard-unstable-v1-client-proto
 		virtual-keyboard-unstable-v1-protocol.c fake-input-client-protocol.h \
 		fake-input-protocol.c
 	$(CC) -Wall -I. -o $@ $< virtual-keyboard-unstable-v1-protocol.c \
-		fake-input-protocol.c `pkg-config --cflags --libs wayland-client xkbcommon`
+		fake-input-protocol.c `pkg-config --cflags --libs wayland-client xkbcommon glib-2.0`
 
 WL_IM_TESTS =
 if USE_WAYLAND_IM
@@ -434,6 +435,7 @@ install:
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im install; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im install; fi
 	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im install; fi
+	if [ $(IBUS_ENGINE) = 'Y' ]; then $(MAKE) -C ibus install; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im install; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im install; fi
 
@@ -446,6 +448,7 @@ uninstall:
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im uninstall; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im uninstall; fi
 	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im uninstall; fi
+	if [ $(IBUS_ENGINE) = 'Y' ]; then $(MAKE) -C ibus uninstall; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im uninstall; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im uninstall; fi
 	rmdir --ignore-fail-on-non-empty $(bindir)
@@ -461,6 +464,7 @@ clean:
 	if [ $(GTK_IM) = 'Y' ]; then $(MAKE) -C gtk-im clean; fi
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) -C gtk3-im clean; fi
 	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) -C gtk4-im clean; fi
+	if [ $(IBUS_ENGINE) = 'Y' ]; then $(MAKE) -C ibus clean; fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im clean; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im clean; fi
 	@rm -f *.o *.d *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \

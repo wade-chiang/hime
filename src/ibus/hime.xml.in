@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HIME as an IBus engine: IBus starts hime-ibus, which passes the keys on
+     to the HIME daemon (GNOME: Settings, Keyboard, Input Sources). -->
+<component>
+	<name>org.freedesktop.IBus.Hime</name>
+	<description>HIME Input Method</description>
+	<exec>%HIME_IBUS% --ibus</exec>
+	<version>%HIME_VERSION%</version>
+	<author>The HIME team</author>
+	<license>LGPL-2.1</license>
+	<homepage>https://github.com/wade-chiang/hime</homepage>
+	<textdomain>hime</textdomain>
+	<engines>
+		<engine>
+			<name>hime</name>
+			<language>zh_TW</language>
+			<license>LGPL-2.1</license>
+			<author>The HIME team</author>
+			<icon>%HIME_ICON%</icon>
+			<layout>us</layout>
+			<longname>HIME</longname>
+			<description>HIME Input Method</description>
+			<symbol>中</symbol>
+			<rank>0</rank>
+		</engine>
+	</engines>
+</component>

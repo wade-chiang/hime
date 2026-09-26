@@ -81,3 +81,5 @@ distro/archlinux/pkg/
 distro/archlinux/src/
 distro/archlinux/hime/
 distro/archlinux/*.pkg.tar.*
+src/ibus/hime-ibus
+src/ibus/hime.xml

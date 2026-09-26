@@ -10,12 +10,13 @@ arch=('x86_64')
 url="https://github.com/wade-chiang/hime"
 license=('LGPL2' 'FDL' 'GPL2')
 depends=('gtk3' 'gtk4' 'gtk-layer-shell' 'libxkbcommon' 'libxtst' 'qt5-base' 'qt6-base')
-makedepends=('git' 'gettext' 'wayland')
+makedepends=('git' 'gettext' 'wayland' 'ibus')
 # The anthy and chewing modules are built when their libraries are
 # installed at build time, and then need them.
 optdepends=('xwayland-satellite: X11 applications on niri'
             'anthy: Japanese input method module'
-            'libchewing: Chewing (新酷音) input method module')
+            'libchewing: Chewing (新酷音) input method module'
+            'ibus: HIME as an input source of GNOME')
 conflicts=('hime' 'hime-git')
 provides=('hime')
 source=("${_pkgname}::git+https://github.com/wade-chiang/hime.git#branch=master")

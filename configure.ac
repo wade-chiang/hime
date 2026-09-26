@@ -520,6 +520,30 @@ AS_IF(
   ]
 )
 AM_CONDITIONAL([USE_WAYLAND_IM], [test "x$enable_wayland_im" = "xyes"])
+# IBUS: hime-ibus, HIME as an IBus engine (GNOME)
+PKG_CHECK_MODULES(
+  [IBUS],
+  [ibus-1.0 >= 1.5],
+  [ibus_is_installed=yes],
+  [ibus_is_installed=no]
+)
+AC_ARG_ENABLE(
+  [ibus-engine],
+  [AS_HELP_STRING([--enable-ibus-engine], [Enable the IBus engine (GNOME), default is auto-detect])],
+  [enable_ibus_engine=$enableval],
+  [enable_ibus_engine=$ibus_is_installed]
+)
+AS_IF(
+  [test "x$enable_ibus_engine" = "xyes"],
+  [
+    AS_IF(
+      [test "x$ibus_is_installed" = "xno"],
+      [AC_MSG_ERROR([Require IBus (>= 1.5) installed])]
+    )
+    AC_SUBST([IBUS_ENGINE], ["Y"])
+  ],
+  [AC_SUBST([IBUS_ENGINE], ["N"])]
+)
 LDFLAGS+=" $GTKLDFLAGS"
 AS_IF(
   [test "x$FREEBSD" = "x0"],
@@ -566,6 +590,7 @@ AC_CONFIG_FILES([
   src/gtk-im/Makefile
   src/gtk3-im/Makefile
   src/gtk4-im/Makefile
+  src/ibus/Makefile
   src/im-client/Makefile
   src/IMdkit/Makefile
   src/IMdkit/lib/Makefile
