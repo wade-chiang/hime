@@ -1,0 +1,9 @@
+@program gtk3-text-input-test
+@compositor kwin
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# As wl-im-repeat.keys, with KWin's input-method-v1:
+# HIME repeats a held key it handles; once the keys typed are gone, the
+# application gets the key, once: it would only repeat it after its own
+# delay, and gets the release before that.
+a <space> a <space> b c d @check @hold <bs>

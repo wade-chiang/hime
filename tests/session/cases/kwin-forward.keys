@@ -1,0 +1,9 @@
+@program gtk3-text-input-test
+@compositor kwin
+# As wl-im-forward.keys, with KWin's input-method-v1:
+# Keys HIME does not handle reach the application through the virtual
+# keyboard, in order after the text committed before them.
+a <space> a <space> <bs> @check
+C-<space> x y <bs> z @check
+# Shift alone switches to English and back, the application also gets it
+C-<space> <shift> a b <shift> a <space>

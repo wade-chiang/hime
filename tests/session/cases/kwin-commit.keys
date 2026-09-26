@@ -1,0 +1,9 @@
+@program gtk3-text-input-test
+@compositor kwin
+# As wl-im-commit.keys, with KWin's input-method-v1:
+# HIME as the Wayland input method: a GTK 3 application using text-input
+# (no HIME module) gets what HIME commits for the keys the compositor sends.
+b 1 a <space> c 2 x <space> @check
+b c <bs> <space> , <space> @check
+# Shift types English; Control+Space turns the input method off and on
+S-h S-i <space> C-<space> a C-<space> a <space>

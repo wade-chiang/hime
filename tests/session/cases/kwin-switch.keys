@@ -1,0 +1,9 @@
+@program gtk3-text-input-test
+@compositor kwin
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# As wl-im-switch.keys, with KWin's input-method-v1:
+# Tab moves to the next field (deactivate, activate): the keys typed into
+# the first one are dropped with its preedit, and the second field types
+# afresh.
+--two a <space> b c @check <tab> @check a <space> @check
