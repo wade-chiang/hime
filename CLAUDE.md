@@ -104,10 +104,10 @@ keeping HIME's own UI and typing feel. Phases:
    unsolicited daemon-to-client message so mouse-driven commits (win1
    candidates, symbol table, virtual keyboard; today XTest, which never
    reaches Wayland clients) work; the input method menu. Modules get the
-   window helpers through `HIME_module_main_functions`; the anthy and
-   chewing modules were changed without being compiled (their libraries
-   are not installed here). The intcode module logs two pre-existing
-   Gtk-CRITICALs (present/show on a NULL window) on X11 too.
+   window helpers through `HIME_module_main_functions` (modules must use
+   it: the daemon exports no symbols). Session tests cover the intcode,
+   chewing and anthy modules (`@method`). The intcode module logs two
+   pre-existing Gtk-CRITICALs (present/show on a NULL window) on X11 too.
 3. `zwp_input_method_v2` + popup surface frontend (niri, sway, Hyprland,
    labwc/Xfce), for OverSpot. Drawing into a popup surface may need the
    candidate UI separated from its GTK windows; the harness's stub list
