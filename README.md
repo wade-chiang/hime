@@ -83,7 +83,7 @@ GNOME 登入時會把 `QT_IM_MODULE`、`QT_IM_MODULES`、`XMODIFIERS` 設成 IBu
 
 - 在 Wayland 程式中，「跟著游標」的輸入視窗會暫時固定在「固定輸入視窗位置」所設定的座標。
 - 用滑鼠點選候選字、符號表或虛擬鍵盤送出的文字，還無法送到原生 Wayland 程式。
-- Anthy、新酷音、內碼等外掛模組的視窗，以及輸入法選單，在 layer-shell 上尚未處理。
+- 輸入法選單（在輸入視窗上按滑鼠中鍵）在 layer-shell 上尚未處理。Anthy、新酷音模組的 layer-shell 支援尚未實際編譯測試（內碼模組已測試）。
 - HIME 跑在 Wayland 上時不提供 XIM，沒有 GTK/Qt IM module 的純 X11 程式無法使用 HIME。
 - GTK 4 程式的 AltGr 修飾鍵不會傳給 HIME。
 - Chromium、Electron 程式在原生 Wayland 下尚未測試。

@@ -103,8 +103,11 @@ keeping HIME's own UI and typing feel. Phases:
    `src/win-common.c`, anchored top-left, placed by margins). Left: an
    unsolicited daemon-to-client message so mouse-driven commits (win1
    candidates, symbol table, virtual keyboard; today XTest, which never
-   reaches Wayland clients) work; module windows (anthy, chewing,
-   intcode) and the input method menu.
+   reaches Wayland clients) work; the input method menu. Modules get the
+   window helpers through `HIME_module_main_functions`; the anthy and
+   chewing modules were changed without being compiled (their libraries
+   are not installed here). The intcode module logs two pre-existing
+   Gtk-CRITICALs (present/show on a NULL window) on X11 too.
 3. `zwp_input_method_v2` + popup surface frontend (niri, sway, Hyprland,
    labwc/Xfce), for OverSpot. Drawing into a popup surface may need the
    candidate UI separated from its GTK windows; the harness's stub list
@@ -147,7 +150,9 @@ Known gaps after phase 1 (from review, not fixed yet):
 - `hime-tsin2gtab-phrase` reads `tsin32` only from `~/.config/hime`, and
   the daemon runs helper tools from the hard-coded `HIME_BIN_DIR`.
 - `src/im-client/` compiles its own copies of `src/*.c` files; the src
-  Makefile always recurses into it so they get rebuilt.
+  Makefile always recurses into it so they get rebuilt. Header
+  dependencies are tracked with `-MMD` (`*.d` files); a build from
+  before that change needs one `make clean`.
 - Packages are linked with `-z now` (Arch makepkg default): every
   undefined symbol of a module and of `libhime-im-client` must resolve
   in the host application. The library is loaded into GTK 4 and Qt apps,
