@@ -34,6 +34,8 @@ def main():
     width, height, pixels = read_ppm(sys.argv[1])
     def pixel(point):
         x, y = (int(v) for v in point.split(","))
+        if not (0 <= x < width and 0 <= y < height):
+            sys.exit(f"{point} is outside the {width}x{height} screenshot")
         offset = (y * width + x) * 3
         return pixels[offset : offset + 3]
 

@@ -459,6 +459,7 @@ int module_init_win (HIME_module_main_functions *pFuncs) {
     }
 
     g_pWinChewing = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    g_himeModMainFuncs.mf_window_init (g_pWinChewing, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (g_pWinChewing), FALSE);
 
     gtk_widget_realize (g_pWinChewing);
@@ -637,7 +638,7 @@ void module_move_win (int nX, int nY) {
     if (nY < 0)
         nY = 0;
 
-    gtk_window_move (GTK_WINDOW (g_pWinChewing), nX, nY);
+    g_himeModMainFuncs.mf_window_move (g_pWinChewing, nX, nY);
 
     *g_himeModMainFuncs.mf_win_x = nX;
     *g_himeModMainFuncs.mf_win_y = nY;
@@ -691,9 +692,9 @@ void module_win_geom (void) {
     if (!g_pWinChewing)
         return;
 
-    gtk_window_get_position (GTK_WINDOW (g_pWinChewing),
-                             g_himeModMainFuncs.mf_win_x,
-                             g_himeModMainFuncs.mf_win_y);
+    g_himeModMainFuncs.mf_window_get_position (g_pWinChewing,
+                                               g_himeModMainFuncs.mf_win_x,
+                                               g_himeModMainFuncs.mf_win_y);
 
     g_himeModMainFuncs.mf_get_win_size (g_pWinChewing,
                                         g_himeModMainFuncs.mf_input_window_width,

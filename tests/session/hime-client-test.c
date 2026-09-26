@@ -88,6 +88,9 @@ static HIME_client_handle *open_client (void) {
 }
 
 int main (int argc, char **argv) {
+    // callers may kill a client waiting in @sleep: keep what it printed
+    setvbuf (stdout, NULL, _IOLBF, 0);
+
     HIME_client_handle *clients[2] = {open_client (), NULL};
     HIME_client_handle *handle = clients[0];
 

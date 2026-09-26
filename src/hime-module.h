@@ -75,6 +75,13 @@ typedef struct {
     gboolean *mf_force_show;
     int *mf_win_x, *mf_win_y, *mf_input_window_width, *mf_input_window_height, *mf_display_width, *mf_display_height;
     gboolean *mf_key_press_shift;
+
+    // windows: layer-shell surfaces where the daemon uses them, see
+    // hime_window_init () in win-common.c; call mf_window_init right after
+    // gtk_window_new
+    void (*mf_window_init) (GtkWidget *win, gboolean positioned);
+    void (*mf_window_move) (GtkWidget *win, int x, int y);
+    void (*mf_window_get_position) (GtkWidget *win, int *x, int *y);
 } HIME_module_main_functions;
 #ifdef __cplusplus
 }

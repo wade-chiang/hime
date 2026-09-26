@@ -11,7 +11,9 @@
 # Xwayland, daemonized as when a client starts it.  Like a GNOME session,
 # XMODIFIERS names IBus.  Requires mutter and dbus-run-session.
 #
-# The daemon's config can be adjusted with HIME_CONF="name=value ..."
+# The daemon's config can be adjusted with HIME_CONF="name=value ...", and
+# HIME_SESSION_METHOD=intcode makes the intcode module (from the build tree)
+# the default input method.
 #
 # With HIME_SESSION_DAEMON_BACKEND=wayland the daemon is forced onto GDK's Wayland
 # backend with no X display at all.
@@ -51,6 +53,10 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     (cd "$conf" && "$top/src/hime-cin2gtab" test-liu.cin >/dev/null)
     printf 'test 1 test-liu.gtab -\n' >"$conf/gtab.list"
     printf '1 test-liu.gtab' >"$conf/config/default-input-method"
+    if [[ "${HIME_SESSION_METHOD:-}" == intcode ]]; then
+        printf 'int 0 intcode-module.so -\n' >>"$conf/gtab.list"
+        printf '0 intcode-module.so' >"$conf/config/default-input-method"
+    fi
     printf '1' >"$conf/config/hime-init-im-enabled"
     for kv in ${HIME_CONF:-}; do
         printf '%s' "${kv#*=}" >"$conf/config/${kv%%=*}"
@@ -133,7 +139,8 @@ x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1 || 
 # HIME_DAEMON makes it daemonize, as when a client starts it.  It sees the
 # session as a desktop would show it (Wayland, plus X on mutter) and picks
 # its backend itself: X11 on mutter, Wayland on sway, which has layer-shell.
-daemon_env=(WAYLAND_DISPLAY="$wl_display" HIME_DAEMON=1 HIME_TABLE_DIR="$top/data")
+daemon_env=(WAYLAND_DISPLAY="$wl_display" HIME_DAEMON=1 HIME_TABLE_DIR="$top/data"
+    HIME_MODULE_DIR="$top/src/modules")
 if [[ "${HIME_SESSION_DAEMON_BACKEND:-}" == wayland ]]; then
     daemon_env+=(HIME_BACKEND=wayland)
 elif [[ -n "$x_display" ]]; then

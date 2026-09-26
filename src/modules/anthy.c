@@ -1206,6 +1206,7 @@ int module_init_win (HIME_module_main_functions *funcs) {
     anthy_context_set_encoding (ac, ANTHY_UTF8_ENCODING);
 
     win_anthy = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    gmf.mf_window_init (win_anthy, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (win_anthy), FALSE);
 
     gtk_widget_realize (win_anthy);
@@ -1308,7 +1309,7 @@ void module_move_win (int x, int y) {
     if (y < 0)
         y = 0;
 
-    gtk_window_move (GTK_WINDOW (win_anthy), x, y);
+    gmf.mf_window_move (win_anthy, x, y);
     *gmf.mf_win_x = x;
     *gmf.mf_win_y = y;
 
@@ -1423,7 +1424,7 @@ void module_reset (void) {
 void module_win_geom () {
     if (!win_anthy)
         return;
-    gtk_window_get_position (GTK_WINDOW (win_anthy), gmf.mf_win_x, gmf.mf_win_y);
+    gmf.mf_window_get_position (win_anthy, gmf.mf_win_x, gmf.mf_win_y);
 
     gmf.mf_get_win_size (win_anthy, gmf.mf_input_window_width, gmf.mf_input_window_height);
 }

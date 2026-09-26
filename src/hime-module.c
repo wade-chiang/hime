@@ -92,4 +92,8 @@ void init_HIME_module_main_functions (HIME_module_main_functions *func) {
     func->mf_display_height = &display_height;
     func->mf_pho_chars = pho_chars;
     func->mf_key_press_shift = &key_press_shift;
+
+    func->mf_window_init = hime_window_init;
+    func->mf_window_move = hime_window_move;
+    func->mf_window_get_position = hime_window_get_position;
 }

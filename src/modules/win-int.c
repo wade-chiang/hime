@@ -126,7 +126,7 @@ void module_move_win (int x, int y) {
 
     *gmf.mf_win_x = x;
     *gmf.mf_win_y = y;
-    gtk_window_move (GTK_WINDOW (gwin_int), x, y);
+    gmf.mf_window_move (gwin_int, x, y);
 }
 
 void create_win_intcode () {
@@ -136,6 +136,7 @@ void create_win_intcode () {
     }
 
     gwin_int = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    gmf.mf_window_init (gwin_int, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (gwin_int), FALSE);
 
     //  gtk_window_set_default_size(GTK_WINDOW (gwin_int), 1, 1);
@@ -204,7 +205,7 @@ void module_show_win () {
 void module_win_geom () {
     if (!gwin_int)
         return;
-    gtk_window_get_position (GTK_WINDOW (gwin_int), gmf.mf_win_x, gmf.mf_win_y);
+    gmf.mf_window_get_position (gwin_int, gmf.mf_win_x, gmf.mf_win_y);
 
     gmf.mf_get_win_size (gwin_int, gmf.mf_input_window_width, gmf.mf_input_window_height);
 }

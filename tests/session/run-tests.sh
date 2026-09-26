@@ -17,9 +17,11 @@
 #                   instead of mutter
 #   @conf NAME=VALUE write a hime config value
 #   @outputs N      number of outputs of the sway session
+#   @method intcode make the intcode module the default input method
 #
 # Usage: run-tests.sh [--update] [CASE.keys...]
-# Exits 77 (skipped) when mutter is not available.
+# Exits 77 (skipped) when mutter is not available; a case whose compositor
+# or tools are missing (exit status 77) is skipped.
 
 set -euo pipefail
 
@@ -62,6 +64,7 @@ for keys in "${cases[@]}"; do
     daemon_backend=""
     compositor=""
     outputs=""
+    method=""
     confs=""
     while read -r directive arg; do
         case "$directive" in
@@ -73,6 +76,7 @@ for keys in "${cases[@]}"; do
         @daemon-wayland) daemon_backend=wayland ;;
         @compositor) compositor="$arg" ;;
         @outputs) outputs="$arg" ;;
+        @method) method="$arg" ;;
         @conf) confs="$confs $arg" ;;
         esac
     done < <(grep '^@' "$keys")
@@ -94,9 +98,16 @@ for keys in "${cases[@]}"; do
     status=0
     HIME_SESSION_X11="$x11" HIME_SESSION_DAEMON_BACKEND="$daemon_backend" \
         HIME_SESSION_COMPOSITOR="$compositor" HIME_SESSION_OUTPUTS="$outputs" \
+        HIME_SESSION_METHOD="$method" \
         HIME_CONF="$confs" \
         "$here/run-session.sh" "${cmd[@]}" \
         >"$tmp/$name.actual" 2>"$tmp/$name.stderr" || status=$?
+    # 77: a tool the case needs (sway, grim, ...) is missing
+    if [[ $status -eq 77 && $exit_status -ne 77 ]]; then
+        echo "skip $name ($(tail -1 "$tmp/$name.stderr"))"
+        skip=$((skip + 1))
+        continue
+    fi
     if [[ $status -ne $exit_status ]]; then
         echo "FAIL $name (exit status $status, expected $exit_status)"
         grep -v -e dbus-daemon -e "connection to the bus" "$tmp/$name.stderr" || true
