@@ -1,0 +1,8 @@
+@program gtk3-text-input-test
+@compositor gnome
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# As wl-im-preedit.keys, through GNOME's IBus (hime-ibus):
+# With the preedit in the application (on the spot, keys included), it
+# shows the keys typed so far.
+b 1 a @check <space> b c @check <bs> @check <space>

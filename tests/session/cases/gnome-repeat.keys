@@ -1,0 +1,12 @@
+@program gtk3-text-input-test
+@compositor gnome
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# As wl-im-repeat.keys, through GNOME's IBus (hime-ibus), except the end:
+# GNOME repeats held keys itself, and passes no repeats of a key on to the
+# application unless it saw the press; hime-ibus passes each one on, so
+# BackSpace goes on deleting the text (here both characters).
+# HIME repeats a held key it handles; once the keys typed are gone, the
+# application gets the key, once: it would only repeat it after its own
+# delay, and gets the release before that.
+a <space> a <space> b c d @check @hold <bs>

@@ -1,0 +1,7 @@
+@program gtk3-text-input-test
+@compositor gnome
+@conf hime-init-im-enabled=0
+# As wl-im-init-disabled.keys, through GNOME's IBus (hime-ibus):
+# With hime-init-im-enabled off, a text-input field starts in English
+# until Control+Space.
+a b C-<space> a <space>

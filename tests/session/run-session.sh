@@ -30,6 +30,11 @@
 # allowed (KWIN_*_NO_PERMISSION_CHECKS).  Screenshots need its OpenGL
 # compositing (a render node or llvmpipe), not QPainter.
 #
+# With HIME_SESSION_COMPOSITOR=gnome it is a headless GNOME Shell (unsafe
+# mode, for its Eval and Screenshot D-Bus methods), whose IBus uses HIME's
+# engine from the build tree (src/ibus) as the only input source; as in a
+# GNOME session, the daemon runs on its Xwayland (no layer-shell).
+#
 # GTK and Qt applications pick up the HIME IM modules from the build tree.
 # With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
 # Xwayland instead.
@@ -44,6 +49,7 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     compositor=mutter
     [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]] && compositor=sway
     [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]] && compositor=kwin_wayland
+    [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]] && compositor=gnome-shell
     for bin in "$compositor" dbus-run-session; do
         if ! command -v "$bin" >/dev/null; then
             echo "run-session.sh: $bin not found" >&2
@@ -87,6 +93,9 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     export HIME_SESSION_INNER=1 HIME_SESSION_TMP="$tmp"
     export XDG_RUNTIME_DIR="$tmp/runtime" HOME="$tmp/home"
     unset DISPLAY WAYLAND_DISPLAY XAUTHORITY
+    # not a remote session (gnome-shell hangs starting Xwayland when run
+    # over SSH)
+    unset SSH_CONNECTION SSH_CLIENT SSH_TTY
     export XMODIFIERS=@im=ibus
     # no gvfs daemons, which would leave a gvfs directory behind
     export GIO_USE_VFS=local
@@ -113,6 +122,30 @@ if [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]]; then
         kwin_wayland --virtual --width 1280 --height 800 --socket wl-hime-test \
         --no-lockscreen --no-global-shortcuts --no-kactivities \
         --inputmethod "env ${daemon_env[*]} $top/src/hime" >"$log" 2>&1 &
+elif [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
+    if [[ ! -x "$top/src/ibus/hime-ibus" ]]; then
+        echo "run-session.sh: src/ibus/hime-ibus not built" >&2
+        exit 77
+    fi
+    # not the logind session of whoever runs the tests
+    export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME XDG_SESSION_ID=hime-test-none
+    # HIME as the only input source; nothing else steals the keys
+    gsettings set org.gnome.desktop.input-sources sources "[('ibus', 'hime')]"
+    gsettings set org.gnome.desktop.search-providers disable-external true
+    gsettings set org.gnome.desktop.screensaver lock-enabled false
+    gsettings set org.gnome.desktop.session idle-delay 0
+    # HIME's engine from the build tree, next to IBus's own components
+    mkdir -p "$tmp/ibus"
+    sed "s|<exec>.*</exec>|<exec>/usr/bin/env LD_LIBRARY_PATH=$top/src/im-client $top/src/ibus/hime-ibus --ibus</exec>|" \
+        "$top/src/ibus/hime.xml" >"$tmp/ibus/hime.xml"
+    export IBUS_COMPONENT_PATH="$tmp/ibus:/usr/share/ibus/component"
+    # GTK applications would start the document portal, a FUSE mount
+    export GDK_DEBUG=no-portals
+    # hime-ibus, started by IBus with the input source, must not start the
+    # installed daemon before ours is up (it connects to ours later)
+    export HIME_IM_CLIENT_NO_AUTO_EXEC=1
+    gnome-shell --headless --wayland --unsafe-mode --wayland-display=wl-hime-test \
+        --virtual-monitor 1280x800 >"$log" 2>&1 &
 elif [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
     printf '%s\n' 'output HEADLESS-1 resolution 1280x800 position 0 0' \
         'output HEADLESS-2 resolution 1280x800 position 1280 0' \
@@ -138,10 +171,13 @@ hime_pids() {
 }
 
 # must not fail: under set -e that would replace the exit status
+keyboard_pid=""
 cleanup() {
+    [[ -n "$keyboard_pid" ]] && { kill "$keyboard_pid" 2>/dev/null || true; }
     kill $(hime_pids) 2>/dev/null || true
     kill "$mutter_pid" 2>/dev/null || true
     wait 2>/dev/null || true
+    fusermount3 -u "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
     rm -rf "$tmp" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -159,6 +195,8 @@ if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
     started='compgen -G "$XDG_RUNTIME_DIR/wayland-[0-9]" >/dev/null'
 elif [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]]; then
     started='[[ -S "$XDG_RUNTIME_DIR/wl-hime-test" ]]'
+elif [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
+    started='grep -q "GNOME Shell started" "$log"'
 else
     started='[[ -S "$XDG_RUNTIME_DIR/wl-hime-test" ]] && grep -q "public X11 display" "$log"'
 fi
@@ -190,6 +228,29 @@ if ! wait_for '[[ -S "$XDG_RUNTIME_DIR/hime/hime.socket" ]]'; then
     echo "run-session.sh: hime did not open its socket" >&2
     cat "$tmp/hime.log" "$log" >&2 2>/dev/null || true
     exit 1
+fi
+
+if [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
+    shell_eval() {
+        gdbus call --session -d org.gnome.Shell -o /org/gnome/Shell -m org.gnome.Shell.Eval "$1" 2>/dev/null
+    }
+    # Our daemon started Xwayland, and GNOME Shell restarts IBus with XIM
+    # then, and with it HIME's engine: wait for that
+    wait_for 'pgrep -f -- "ibus-daemon .*--xim" >/dev/null' || true
+    # HIME's input source, through IBus
+    if ! wait_for 'shell_eval "Main.inputMethod._currentSource?.id" | grep -q "hime" &&
+            [[ "$(WAYLAND_DISPLAY=$wl_display ibus engine 2>/dev/null)" == hime ]]'; then
+        echo "run-session.sh: the HIME input source did not become active" >&2
+        cat "$log" >&2
+        exit 1
+    fi
+    # a keyboard, which a headless GNOME has not: else no window gets the
+    # keyboard focus
+    "$here/rd-type.py" --keep &
+    keyboard_pid=$!
+    # the shell starts in the overview, where new windows get no focus
+    shell_eval 'Main.overview.hide()' >/dev/null
+    wait_for 'shell_eval "Main.overview.visible || Main.overview.animationInProgress" | grep -q "false"'
 fi
 
 export WAYLAND_DISPLAY="$wl_display"

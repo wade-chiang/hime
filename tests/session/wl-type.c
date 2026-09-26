@@ -21,7 +21,8 @@
  * keyboard would (the compositor sends them to the input method's grab).
  * On KWin, which has no virtual keyboard protocol, through its fake input
  * (the session must allow it: KWIN_WAYLAND_NO_PERMISSION_CHECKS=1); the
- * keys then use KWin's keymap, which must be the "us" layout.
+ * keys then use KWin's keymap, which must be the "us" layout.  On GNOME
+ * (Mutter), through rd-type.py.
  *
  * Usage: wl-type KEY...
  *   KEY is a single character of the "us" layout or one of <space>
@@ -40,6 +41,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <glib.h>
 #include <wayland-client.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -206,6 +208,11 @@ int main (int argc, char **argv) {
     wl_registry_add_listener (registry, &registry_listener, NULL);
     wl_display_roundtrip (display);
     if (!seat || (!manager && !fake_input)) {
+        // GNOME: through Mutter's RemoteDesktop D-Bus interface
+        char *dir = g_path_get_dirname (argv[0]);
+        char *rd_type = g_build_filename (dir, "rd-type.py", NULL);
+        argv[0] = rd_type;
+        execv (rd_type, argv);
         fprintf (stderr, "wl-type: no virtual keyboard support\n");
         return 1;
     }

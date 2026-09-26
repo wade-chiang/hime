@@ -1,0 +1,10 @@
+@program gtk3-text-input-test
+@compositor gnome
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# As wl-im-notify.keys, through GNOME's IBus (hime-ibus):
+# Mouse actions commit text (the symbol table), change the preedit
+# (candidates), and type keys (the virtual keyboard) without key events;
+# the keys typed before stay in the preedit.
+b @hook commit 測試 @check @hook preedit @check
+<space> @check @hook key c @check @hook key space

@@ -1,0 +1,6 @@
+@program gtk4-text-input-test
+@compositor gnome
+# As wl-im-gtk4.keys, through GNOME's IBus (hime-ibus):
+# A GTK 4 application using text-input, as GTK 4 does by default.
+b 1 a <space> c 2 @check
+S-h C-<space> a C-<space> a <space>
