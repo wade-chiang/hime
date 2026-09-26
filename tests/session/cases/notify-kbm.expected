@@ -1,0 +1,3 @@
+@wait    commit="三" preedit=""
+module=hime
+backend=GdkWaylandDisplay

@@ -25,9 +25,12 @@
  * Usage: gtk{3,4}-im-test KEY...
  *   KEY is a single printable character or one of <space> <enter> <bs>
  *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).
+ *   @wait MS runs the main loop for MS, then prints what the module
+ *   committed meanwhile (notifications) and its preedit.
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <gtk/gtk.h>
@@ -157,6 +160,22 @@ int main (int argc, char **argv) {
 
     int i;
     for (i = 1; i < argc; i++) {
+        if (!strcmp (argv[i], "@wait") && i + 1 < argc) {
+            g_string_truncate (commits, 0);
+            const gint64 end = g_get_monotonic_time () + atoi (argv[++i]) * 1000;
+            while (g_get_monotonic_time () < end) {
+                while (g_main_context_iteration (NULL, FALSE))
+                    ;
+                g_usleep (10000);
+            }
+
+            char *preedit = NULL;
+            gtk_im_context_get_preedit_string (context, &preedit, NULL, NULL);
+            printf ("@wait    commit=\"%s\" preedit=\"%s\"\n", commits->str, preedit);
+            g_free (preedit);
+            continue;
+        }
+
         GdkModifierType state;
         guint keyval = parse_key (argv[i], &state);
         if (keyval == GDK_KEY_VoidSymbol) {

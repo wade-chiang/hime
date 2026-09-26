@@ -1,0 +1,5 @@
+@program notify-check.sh
+@env HIME_NOTIFY_HOOKS=key b;key c;key space
+# Virtual keyboard clicks are typed into the engine and the result reaches
+# a GTK 4 application on Wayland as a notification: b c space is 三.
+gtk4-im-test

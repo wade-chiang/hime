@@ -1,0 +1,4 @@
+@program notify-check.sh
+# A GTK 4 application on Wayland gets text committed without a key event
+# (symbol table, candidate clicks) through the module's notification watch.
+gtk4-im-test b

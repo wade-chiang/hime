@@ -25,6 +25,8 @@
 
 #include <X11/keysym.h>
 
+#include <glib-unix.h>
+
 #include "gtkimcontexthime.h"
 #include "hime-im-client.h"
 
@@ -43,6 +45,10 @@ struct _GtkIMContextHIME {
     HIMEClient *client;
 
     HIME_client_handle *hime_ch;
+
+    // watch on the daemon connection for notifications
+    guint notify_source;
+    int notify_fd;
 
     // preedit
     char *pe_str;
@@ -164,6 +170,8 @@ static void
 gtk_im_context_hime_init (GtkIMContextHIME *im_context_hime) {
     im_context_hime->client = NULL;
     im_context_hime->hime_ch = NULL;
+    im_context_hime->notify_source = 0;
+    im_context_hime->notify_fd = 0;
     init_preedit (im_context_hime);
 }
 
@@ -191,6 +199,11 @@ static void gtk_im_context_hime_finalize (GObject *obj) {
     GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (obj);
 
     clear_preedit (context_xim);
+
+    if (context_xim->notify_source) {
+        g_source_remove (context_xim->notify_source);
+        context_xim->notify_source = 0;
+    }
 
     if (context_xim->hime_ch) {
         hime_im_client_close (context_xim->hime_ch);
@@ -273,6 +286,105 @@ static void get_hime_im_client (GtkIMContextHIME *context_xim) {
         }
 
         init_preedit (context_xim);
+        hime_im_client_enable_notify (context_xim->hime_ch);
+    }
+}
+
+// Notifications: text the daemon commits without a key event (mouse clicks
+// on candidates, the symbol table), and preedit changes.
+
+// Refresh the preedit after a notification.  filter_keypress does the same
+// for key events, interleaved with its commit.
+static void update_preedit_from_notification (GtkIMContextHIME *context_xim) {
+    GtkIMContext *context = GTK_IM_CONTEXT (context_xim);
+
+    char *preedit_str = NULL;
+    HIME_PREEDIT_ATTR attr[HIME_PREEDIT_ATTR_MAX_N];
+    int cursor_pos = 0;
+    int sub_comp_len = 0;
+    const int attrN = hime_im_client_get_preedit (context_xim->hime_ch,
+                                                  &preedit_str, attr, &cursor_pos, &sub_comp_len);
+    const gboolean has_preedit_str = (preedit_str && preedit_str[0]) || sub_comp_len;
+
+    if (!context_xim->pe_started && has_preedit_str) {
+        g_signal_emit_by_name (context, "preedit-start");
+        context_xim->pe_started = TRUE;
+    }
+
+    free (context_xim->pe_str);
+    context_xim->pe_str = preedit_str;
+    free (context_xim->pe_attr);
+    context_xim->pe_attr = NULL;
+    context_xim->pe_attrN = attrN;
+    if (attrN > 0) {
+        context_xim->pe_attr = malloc (sizeof (HIME_PREEDIT_ATTR) * attrN);
+        if (context_xim->pe_attr) {
+            memcpy (context_xim->pe_attr, attr, sizeof (HIME_PREEDIT_ATTR) * attrN);
+        }
+    }
+    context_xim->pe_cursor = cursor_pos;
+
+    g_signal_emit_by_name (context, "preedit-changed");
+
+    if (!has_preedit_str && context_xim->pe_started) {
+        clear_preedit (context_xim);
+        g_signal_emit_by_name (context, "preedit-end");
+    }
+}
+
+// Hand out the notifications received, whether through the watch or while
+// waiting for another reply.
+static void handle_notifications (GtkIMContextHIME *context_xim) {
+    char *commit = NULL;
+    if (!context_xim->hime_ch || !hime_im_client_read_notify (context_xim->hime_ch, &commit)) {
+        return;
+    }
+
+    if (commit) {
+        g_signal_emit_by_name (context_xim, "commit", commit);
+        free (commit);
+    }
+    update_preedit_from_notification (context_xim);
+}
+
+static void watch_notifications (GtkIMContextHIME *context_xim);
+
+static gboolean cb_notification (gint fd, GIOCondition condition, gpointer data) {
+    GtkIMContextHIME *context_xim = GTK_IM_CONTEXT_HIME (data);
+
+    handle_notifications (context_xim);
+
+    // the connection closed or was reopened on another fd
+    if (condition & (G_IO_HUP | G_IO_ERR) ||
+        hime_im_client_get_fd (context_xim->hime_ch) != fd) {
+        context_xim->notify_source = 0;
+        context_xim->notify_fd = 0;
+        watch_notifications (context_xim);
+        return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
+}
+
+// Watch the daemon connection, following reconnections.
+static void watch_notifications (GtkIMContextHIME *context_xim) {
+    if (!context_xim->hime_ch) {
+        return;
+    }
+
+    const int fd = hime_im_client_get_fd (context_xim->hime_ch);
+    if (context_xim->notify_source && fd == context_xim->notify_fd) {
+        return;
+    }
+
+    if (context_xim->notify_source) {
+        g_source_remove (context_xim->notify_source);
+        context_xim->notify_source = 0;
+    }
+
+    if (fd > 0 && context_xim->hime_ch->notify_ok) {
+        context_xim->notify_source = g_unix_fd_add (fd, G_IO_IN | G_IO_HUP | G_IO_ERR,
+                                                    cb_notification, context_xim);
+        context_xim->notify_fd = fd;
     }
 }
 
@@ -472,6 +584,9 @@ static gboolean gtk_im_context_hime_filter_keypress (GtkIMContext *context,
         g_signal_emit_by_name (context, "preedit-end");
     }
 
+    watch_notifications (context_xim);
+    handle_notifications (context_xim);
+
     return result;
 }
 
@@ -484,6 +599,9 @@ static void gtk_im_context_hime_focus_in (GtkIMContext *context) {
     if (context_xim->hime_ch) {
         hime_im_client_focus_in (context_xim->hime_ch);
     }
+
+    watch_notifications (context_xim);
+    handle_notifications (context_xim);
 }
 
 static void gtk_im_context_hime_focus_out (GtkIMContext *context) {
