@@ -40,6 +40,7 @@ typedef struct {
     uint32_t seed;
     Connection_type type;
     int fd;
+    gboolean notify;  // the client takes notifications (HIME_NOTIFY_MAGIC)
 } HIME_ENT;
 
 // im-addr.c
@@ -52,6 +53,8 @@ void get_hime_im_srv_default_sock_path (char *outstr, const int outstrN);
 extern HIME_ENT *hime_clients;
 extern int hime_clientsN;
 void process_client_req (const int fd);
+gboolean hime_notify_ready (void);
+void hime_notify_send (void);
 
 // im-srv.c
 extern Server_IP_port srv_ip_port;

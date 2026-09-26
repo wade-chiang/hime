@@ -27,8 +27,10 @@
  *   connection (two text fields, both without an X window); @new closes
  *   the focused connection and focuses a new one in its place (an
  *   application quits, another starts).  @sleep MS waits, keeping the
- *   connection open.  -m sends a daemon message (as hime-setup does)
- *   first.
+ *   connection open.  @wait MS waits while taking notifications (text the
+ *   daemon commits without a key event) and prints them.  -m sends a
+ *   daemon message (as hime-setup does) first; with no keys after it the
+ *   client never takes the focus.
  * Exit status: 0 if connected, 1 if no daemon could be reached.
  */
 
@@ -84,7 +86,22 @@ static HIME_client_handle *open_client (void) {
         fprintf (stderr, "cannot connect to hime\n");
         exit (1);
     }
+    hime_im_client_enable_notify (handle);
     return handle;
+}
+
+static void wait_for_notifications (HIME_client_handle *handle, int ms) {
+    for (; ms > 0; ms -= 20) {
+        char *commit = NULL;
+        if (hime_im_client_read_notify (handle, &commit)) {
+            printf ("notify");
+            if (commit)
+                printf (" commit=\"%s\"", commit);
+            printf ("\n");
+            free (commit);
+        }
+        usleep (20000);
+    }
 }
 
 int main (int argc, char **argv) {
@@ -98,11 +115,20 @@ int main (int argc, char **argv) {
     if (argc > 2 && !strcmp (argv[1], "-m")) {
         hime_im_client_send_message (handle, argv[2]);
         argi = 3;
+        if (argi == argc) {
+            hime_im_client_close (handle);
+            return 0;
+        }
     }
 
     hime_im_client_focus_in (handle);
 
     for (; argi < argc; argi++) {
+        if (!strcmp (argv[argi], "@wait") && argi + 1 < argc) {
+            wait_for_notifications (handle, atoi (argv[++argi]));
+            continue;
+        }
+
         if (!strcmp (argv[argi], "@sleep") && argi + 1 < argc) {
             usleep (atoi (argv[++argi]) * 1000);
             continue;

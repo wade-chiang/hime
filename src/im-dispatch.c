@@ -142,6 +142,39 @@ static void write_reply (HIME_reply *reply, const int fd) {
     }
 }
 
+// The connection of the current client, if it takes notifications; -1
+// otherwise.
+static int notify_fd (void) {
+    if (!current_CS || !current_CS->b_hime_protocol) {
+        return -1;
+    }
+
+    int fd;
+    for (fd = 0; fd < hime_clientsN; fd++) {
+        if (hime_clients[fd].cs == current_CS && hime_clients[fd].notify) {
+            return fd;
+        }
+    }
+    return -1;
+}
+
+// Can text be committed to the current client without a key event from it?
+gboolean hime_notify_ready (void) {
+    return notify_fd () >= 0;
+}
+
+// Send the output buffer (text to commit, possibly none) to the current
+// client, which then also refreshes its preedit.
+void hime_notify_send (void) {
+    const int fd = notify_fd ();
+    if (fd < 0) {
+        return;
+    }
+
+    HIME_reply notification = {HIME_NOTIFY_MAGIC, 0};
+    write_reply (&notification, fd);
+}
+
 static void do_process_key (HIME_req *req,
                             HIME_reply *reply,
                             const int fd,
@@ -197,6 +230,14 @@ static void do_set_flags (HIME_req *req,
     int rflags = 0;
     if (hime_pop_up_win) {
         rflags = FLAG_HIME_srv_ret_status_use_pop_up;
+    }
+
+    // Notifications are written unasked, which would break the keystream
+    // of an encrypted TCP connection: UNIX sockets only.
+    if (req->flag & FLAG_HIME_client_handle_notify &&
+        hime_clients[fd].type == Connection_type_unix) {
+        hime_clients[fd].notify = TRUE;
+        rflags |= FLAG_HIME_srv_ret_status_notify;
     }
 
     write_enc (fd, &rflags, sizeof (rflags));

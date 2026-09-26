@@ -450,6 +450,8 @@ void message_cb (char *message) {
         kbm_toggle ();
     } else if (strstr (message, "#hime_message")) {
         execute_message (message);
+    } else if (!strncmp (message, "#hime_test ", 11) && getenv ("HIME_TEST_HOOKS")) {
+        hime_test_hook (message + 11);
     } else
 #if TRAY_ENABLED
         if (!strcmp (message, UPDATE_TRAY)) {

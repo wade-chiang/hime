@@ -149,7 +149,9 @@ x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1 || 
 # HIME_DAEMON makes it daemonize, as when a client starts it.  It sees the
 # session as a desktop would show it (Wayland, plus X on mutter) and picks
 # its backend itself: X11 on mutter, Wayland on sway, which has layer-shell.
+# HIME_TEST_HOOKS: tests/session/notify-check.sh drives mouse actions
 daemon_env=(WAYLAND_DISPLAY="$wl_display" HIME_DAEMON=1 HIME_TABLE_DIR="$top/data"
+    HIME_TEST_HOOKS=1
     HIME_MODULE_DIR="$top/src/modules")
 if [[ "${HIME_SESSION_DAEMON_BACKEND:-}" == wayland ]]; then
     daemon_env+=(HIME_BACKEND=wayland)

@@ -18,6 +18,7 @@
  */
 
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 
@@ -356,6 +357,12 @@ next:;
 
         int rstatus = 0;
         hime_im_client_set_flags (handle, flags_backup, &rstatus);
+
+        // a new daemon: ask again
+        if (BITON (handle->flag, FLAG_HIME_client_handle_notify)) {
+            hime_im_client_set_flags (handle, FLAG_HIME_client_handle_notify, &rstatus);
+            handle->notify_ok = BITON (rstatus, FLAG_HIME_srv_ret_status_notify);
+        }
     }
 
     return handle;
@@ -454,9 +461,21 @@ static ssize_t handle_read (HIME_client_handle *handle,
     SAVE_ACT save_act;
     save_old_sigaction (&save_act);
 
-    const ssize_t r = read (handle->fd, ptr, n);
-    if (r < 0) {
-        perror ("handle_read");
+    // a stream may return less than asked for: read all of it
+    ssize_t r = 0;
+    while (r < n) {
+        const ssize_t got = read (handle->fd, (char *) ptr + r, n - r);
+        if (got < 0 && errno == EINTR) {
+            continue;
+        }
+        if (got < 0) {
+            perror ("handle_read");
+        }
+        if (got <= 0) {
+            r = got;
+            break;
+        }
+        r += got;
     }
 
     restore_old_sigaction (&save_act);
@@ -470,6 +489,65 @@ static ssize_t handle_read (HIME_client_handle *handle,
     }
 
     return r;
+}
+
+// Read the body of a notification, whose HIME_NOTIFY_MAGIC was just read,
+// and keep it until hime_im_client_read_notify () hands it out.
+static int read_notify_body (HIME_client_handle *handle) {
+    uint32_t datalen = 0;
+    if (handle_read (handle, &datalen, sizeof (datalen)) <= 0) {
+        return 0;
+    }
+    to_hime_endian_4 (&datalen);
+
+    if (datalen > 0) {
+        char *text = malloc (datalen);
+        if (!text || handle_read (handle, text, datalen) <= 0) {
+            free (text);
+            return 0;
+        }
+        text[datalen - 1] = '\0';
+
+        if (handle->notify_commit) {
+            char *joined = g_strconcat (handle->notify_commit, text, NULL);
+            free (handle->notify_commit);
+            free (text);
+            text = strdup (joined);
+            g_free (joined);
+        }
+        handle->notify_commit = text;
+    }
+
+    handle->notify_pending = TRUE;
+    return 1;
+}
+
+// Read the start of a reply into ptr (n >= 4 bytes), first taking in any
+// notifications that arrived before it.
+static ssize_t read_reply (HIME_client_handle *handle, void *ptr, const int n) {
+    for (;;) {
+        uint32_t head = 0;
+        if (handle_read (handle, &head, sizeof (head)) <= 0) {
+            return 0;
+        }
+
+        uint32_t value = head;
+        to_hime_endian_4 (&value);
+        if (value != HIME_NOTIFY_MAGIC) {
+            memcpy (ptr, &head, sizeof (head));
+            break;
+        }
+
+        if (!read_notify_body (handle)) {
+            return 0;
+        }
+    }
+
+    if (n > (int) sizeof (uint32_t) &&
+        handle_read (handle, (char *) ptr + sizeof (uint32_t), n - sizeof (uint32_t)) <= 0) {
+        return 0;
+    }
+    return n;
 }
 
 // write to hime server
@@ -530,6 +608,7 @@ void hime_im_client_close (HIME_client_handle *handle) {
 
     free (handle->passwd);
     handle->passwd = NULL;
+    free (handle->notify_commit);
     free (handle);
     handle = NULL;
 }
@@ -576,7 +655,7 @@ int hime_im_client_get_preedit (HIME_client_handle *handle,
     }
 
     int str_len = 0;
-    if (handle_read (handle, &str_len, sizeof (str_len)) <= 0) {
+    if (read_reply (handle, &str_len, sizeof (str_len)) <= 0) {
         goto err_ret;
     }
 
@@ -657,7 +736,7 @@ static int hime_im_client_forward_key_event (HIME_client_handle *handle,
 
     HIME_reply reply;
     memset (&reply, 0, sizeof (reply));
-    if (handle_read (handle, &reply, sizeof (reply)) <= 0) {
+    if (read_reply (handle, &reply, sizeof (reply)) <= 0) {
         error_proc (handle, "cannot read reply from hime server");
         return FALSE;
     }
@@ -781,7 +860,7 @@ void hime_im_client_focus_out2 (HIME_client_handle *handle, char **rstr) {
 
     HIME_reply reply;
     memset (&reply, 0, sizeof (reply));
-    if (handle_read (handle, &reply, sizeof (reply)) <= 0) {
+    if (read_reply (handle, &reply, sizeof (reply)) <= 0) {
         error_proc (handle, "cannot read reply from hime server");
         return;
     }
@@ -862,7 +941,7 @@ void hime_im_client_set_flags (HIME_client_handle *handle,
         error_proc (handle, "hime_im_client_set_flags error");
     }
 
-    if (handle_read (handle, ret_flag, sizeof (int)) <= 0) {
+    if (read_reply (handle, ret_flag, sizeof (int)) <= 0) {
         error_proc (handle, "cannot read ret_flag from hime server");
     }
 }
@@ -888,7 +967,7 @@ void hime_im_client_clear_flags (HIME_client_handle *handle,
         error_proc (handle, "hime_im_client_clear_flags error");
     }
 
-    if (handle_read (handle, ret_flag, sizeof (int)) <= 0) {
+    if (read_reply (handle, ret_flag, sizeof (int)) <= 0) {
         error_proc (handle, "cannot read ret_flag from hime server");
     }
 }
@@ -922,6 +1001,63 @@ void hime_im_client_send_message (HIME_client_handle *handle,
     if (handle_write (handle, message, len) <= 0) {
         error_proc (handle, "hime_im_client_send_message error w message");
     }
+}
+
+int hime_im_client_enable_notify (HIME_client_handle *handle) {
+    if (skip_processing (handle)) {
+        return FALSE;
+    }
+
+    handle->flag |= FLAG_HIME_client_handle_notify;
+
+    int ret_flag = 0;
+    hime_im_client_set_flags (handle, FLAG_HIME_client_handle_notify, &ret_flag);
+    handle->notify_ok = BITON (ret_flag, FLAG_HIME_srv_ret_status_notify);
+    return handle->notify_ok;
+}
+
+int hime_im_client_get_fd (HIME_client_handle *handle) {
+    return handle && handle->fd > 0 ? handle->fd : 0;
+}
+
+int hime_im_client_read_notify (HIME_client_handle *handle, char **commit) {
+    *commit = NULL;
+    if (!handle) {
+        return FALSE;
+    }
+
+    // take in what the daemon sent, without blocking
+    while (handle->fd > 0) {
+        struct pollfd pfd = {handle->fd, POLLIN, 0};
+        if (poll (&pfd, 1, 0) <= 0) {
+            break;
+        }
+        if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL) && !(pfd.revents & POLLIN)) {
+            error_proc (handle, "hime server closed the connection");
+            break;
+        }
+
+        uint32_t head = 0;
+        if (handle_read (handle, &head, sizeof (head)) <= 0) {
+            error_proc (handle, "cannot read notification from hime server");
+            break;
+        }
+        to_hime_endian_4 (&head);
+        // only notifications come unasked
+        if (head != HIME_NOTIFY_MAGIC || !read_notify_body (handle)) {
+            error_proc (handle, "unexpected data from hime server");
+            break;
+        }
+    }
+
+    if (!handle->notify_pending) {
+        return FALSE;
+    }
+
+    *commit = handle->notify_commit;
+    handle->notify_commit = NULL;
+    handle->notify_pending = FALSE;
+    return TRUE;
 }
 
 Window find_hime_window (Display *display) {

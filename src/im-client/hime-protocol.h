@@ -77,6 +77,13 @@ typedef struct {
     uint32_t datalen;  // '\0' shoule be counted if data is string
 } HIME_reply;
 
+// A notification the daemon sends on its own, to a client that asked for
+// them (FLAG_HIME_client_handle_notify): a HIME_reply whose flag is
+// HIME_NOTIFY_MAGIC, followed by datalen bytes of text to commit (possibly
+// none), after which the client refreshes its preedit.  It may arrive
+// before any reply; no reply starts with this value.
+#define HIME_NOTIFY_MAGIC 0xfffffffeU
+
 #define __HIME_PASSWD_N_ (31)
 
 typedef struct HIME_PASSWD {

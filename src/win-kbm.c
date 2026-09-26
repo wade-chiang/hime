@@ -175,8 +175,23 @@ static void mod_fg_all (GtkWidget *label, GdkRGBA *rgbfg) {
     gtk_widget_override_color (label, GTK_STATE_FLAG_PRELIGHT, rgbfg);
 }
 
-// XTest: only on X11
-static void send_fake_key_eve2 (const KeySym key, const gboolean press) {
+// A click on a virtual keyboard key.  With XTest, a real key event reaches
+// the focused (X11) application.  Clients taking notifications get the key
+// typed into the engine directly and the result sent to them; modifiers
+// and keys the engine does not take (BackSpace, arrows, ...) cannot be
+// passed on to the application then.
+void win_kbm_send_key (const KeySym key, const gboolean press) {
+    if (hime_notify_ready ()) {
+        if (press && !IsModifierKey (key)) {
+            if (!ProcessKeyPress (key, 0) && key >= ' ' && key < 0x7f) {
+                send_ascii ((char) key);
+            }
+            ProcessKeyRelease (key, 0);
+            hime_notify_send ();
+        }
+        return;
+    }
+
     if (!dpy) {
         return;
     }
@@ -186,14 +201,14 @@ static void send_fake_key_eve2 (const KeySym key, const gboolean press) {
 
 static gboolean timeout_repeat (gpointer data) {
     const KeySym k = GPOINTER_TO_INT (data);
-    send_fake_key_eve2 (k, TRUE);
+    win_kbm_send_key (k, TRUE);
     return TRUE;
 }
 
 static gboolean timeout_first_time (gpointer data) {
     const KeySym k = GPOINTER_TO_INT (data);
     dbg ("timeout_first_time %c\n", k);
-    send_fake_key_eve2 (k, TRUE);
+    win_kbm_send_key (k, TRUE);
     kbm_timeout_handle = g_timeout_add (50, timeout_repeat, data);
     return FALSE;
 }
@@ -203,7 +218,7 @@ static void clear_hold (KEY *k) {
     GtkWidget *laben = k->laben;
     k->flag &= ~K_PRESS;
     mod_fg_all (laben, NULL);
-    send_fake_key_eve2 (keysym, FALSE);
+    win_kbm_send_key (keysym, FALSE);
 }
 
 static gboolean timeout_clear_hold (gpointer data) {
@@ -229,7 +244,7 @@ static void cb_button_click (GtkWidget *wid, KEY *k) {
         if (k->flag & K_PRESS) {
             clear_hold (k);
         } else {
-            send_fake_key_eve2 (keysym, TRUE);
+            win_kbm_send_key (keysym, TRUE);
             k->flag |= K_PRESS;
             mod_fg_all (laben, &red);
             g_timeout_add (10000, timeout_clear_hold, GINT_TO_POINTER (k));
@@ -237,7 +252,7 @@ static void cb_button_click (GtkWidget *wid, KEY *k) {
     } else {
         clear_kbm_timeout_handle ();
         kbm_timeout_handle = g_timeout_add (500, timeout_first_time, GINT_TO_POINTER (keysym));
-        send_fake_key_eve2 (keysym, TRUE);
+        win_kbm_send_key (keysym, TRUE);
     }
 }
 
@@ -245,7 +260,7 @@ static void cb_button_release (GtkWidget *wid, KEY *k) {
     dbg ("cb_button_release %d\n", kbm_timeout_handle);
     clear_kbm_timeout_handle ();
 
-    send_fake_key_eve2 (k->keysym, FALSE);
+    win_kbm_send_key (k->keysym, FALSE);
 
     for (int i = 0; i < keysN; i++) {
         for (int j = 0; keys[i][j].enkey; j++) {
@@ -253,7 +268,7 @@ static void cb_button_release (GtkWidget *wid, KEY *k) {
                 continue;
             }
             keys[i][j].flag &= ~K_PRESS;
-            send_fake_key_eve2 (keys[i][j].keysym, FALSE);
+            win_kbm_send_key (keys[i][j].keysym, FALSE);
             mod_fg_all (keys[i][j].laben, NULL);
         }
     }

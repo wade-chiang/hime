@@ -42,16 +42,24 @@ typedef struct HIME_client_handle_S {
     Display *display; /* X Display, not a GdkDisplay */
     struct HIME_PASSWD *passwd;
     uint32_t seq;
+
+    // notifications received but not yet handed out
+    char *notify_commit;
+    int notify_pending;
+    // the daemon sends notifications (hime_im_client_enable_notify)
+    int notify_ok;
 } HIME_client_handle;
 
 enum {
     FLAG_HIME_client_handle_has_focus = 1,
     FLAG_HIME_client_handle_use_preedit = 2,
-    FLAG_HIME_client_handle_raise_window = 0x1000  // for mozilla, dirty fix
+    FLAG_HIME_client_handle_raise_window = 0x1000,  // for mozilla, dirty fix
+    FLAG_HIME_client_handle_notify = 0x2000         // wants notifications
 };
 
 enum {
-    FLAG_HIME_srv_ret_status_use_pop_up = 1  // If this is used, we don't need the dirty fix
+    FLAG_HIME_srv_ret_status_use_pop_up = 1,  // If this is used, we don't need the dirty fix
+    FLAG_HIME_srv_ret_status_notify = 2       // will send notifications
 };
 
 #ifdef __cplusplus
@@ -115,6 +123,22 @@ void hime_im_client_clear_flags (HIME_client_handle *handle,
 // write message to hime server
 void hime_im_client_send_message (HIME_client_handle *handle,
                                   const char *message);
+
+// Notifications: text the daemon commits outside of key events, e.g. when
+// a candidate is clicked.  Without them the daemon injects a key with XTest
+// to get a request to answer, which only works for X11 applications.
+//
+// Ask the daemon for notifications; TRUE if it will send them.  They then
+// arrive on the connection's fd, hime_im_client_get_fd () (0 when not
+// connected): watch it for input in the main loop and call
+// hime_im_client_read_notify ().
+int hime_im_client_enable_notify (HIME_client_handle *handle);
+int hime_im_client_get_fd (HIME_client_handle *handle);
+// TRUE if notifications arrived; then *commit is text to commit (to be
+// freed) or NULL, and the preedit should be refreshed.  Never blocks.  It
+// also hands out notifications received while waiting for other replies,
+// so call it after other requests too.
+int hime_im_client_read_notify (HIME_client_handle *handle, char **commit);
 
 // return the X Window of the display
 Window find_hime_window (Display *display);

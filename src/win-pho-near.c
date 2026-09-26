@@ -84,6 +84,8 @@ static void cb_sel (GtkWidget *button, gpointer user_data) {
     add_to_tsin_buf (tt, &near_entry->pk, 1);
 
     close_win_pho_near ();
+    // the application shows the changed phrase buffer in its preedit
+    force_preedit_shift ();
 }
 
 char *phokey2pinyin (phokey_t k);
