@@ -9,3 +9,9 @@ unchanged from wlroots (https://gitlab.freedesktop.org/wlroots/wlroots,
   not handle on to the application.
 
 The build generates their client code with `wayland-scanner`.
+
+For the session tests only (`tests/session/wl-type`):
+
+- `fake-input.xml`: KWin's key injection, from plasma-wayland-protocols
+  (https://invent.kde.org/libraries/plasma-wayland-protocols, `src/protocols/`,
+  LGPL-2.1-or-later): KWin offers no virtual keyboard protocol.

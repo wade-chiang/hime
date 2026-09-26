@@ -19,6 +19,9 @@
 /*
  * Types keys on the Wayland seat through a virtual keyboard, as a physical
  * keyboard would (the compositor sends them to the input method's grab).
+ * On KWin, which has no virtual keyboard protocol, through its fake input
+ * (the session must allow it: KWIN_WAYLAND_NO_PERMISSION_CHECKS=1); the
+ * keys then use KWin's keymap, which must be the "us" layout.
  *
  * Usage: wl-type KEY...
  *   KEY is a single character of the "us" layout or one of <space>
@@ -40,6 +43,7 @@
 #include <wayland-client.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "fake-input-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 
 // evdev key codes
@@ -55,6 +59,7 @@ static struct wl_display *display;
 static struct wl_seat *seat;
 static struct zwp_virtual_keyboard_manager_v1 *manager;
 static struct zwp_virtual_keyboard_v1 *keyboard;
+static struct org_kde_kwin_fake_input *fake_input;
 static struct xkb_keymap *keymap;
 static uint32_t mods;
 
@@ -64,6 +69,8 @@ static void registry_global (void *data, struct wl_registry *registry, uint32_t 
         seat = wl_registry_bind (registry, name, &wl_seat_interface, 1);
     } else if (!strcmp (interface, zwp_virtual_keyboard_manager_v1_interface.name)) {
         manager = wl_registry_bind (registry, name, &zwp_virtual_keyboard_manager_v1_interface, 1);
+    } else if (!strcmp (interface, org_kde_kwin_fake_input_interface.name) && version >= 4) {
+        fake_input = wl_registry_bind (registry, name, &org_kde_kwin_fake_input_interface, 4);
     }
 }
 
@@ -87,6 +94,12 @@ static void sleep_ms (int ms) {
 }
 
 static void key (uint32_t code, int press) {
+    if (!keyboard) {
+        // the compositor keeps track of the modifiers
+        org_kde_kwin_fake_input_keyboard_key (fake_input, code,
+                                              press ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+        return;
+    }
     zwp_virtual_keyboard_v1_key (keyboard, now_ms (), code,
                                  press ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
     uint32_t mod = 0;
@@ -192,11 +205,10 @@ int main (int argc, char **argv) {
     struct wl_registry *registry = wl_display_get_registry (display);
     wl_registry_add_listener (registry, &registry_listener, NULL);
     wl_display_roundtrip (display);
-    if (!seat || !manager) {
+    if (!seat || (!manager && !fake_input)) {
         fprintf (stderr, "wl-type: no virtual keyboard support\n");
         return 1;
     }
-    keyboard = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard (manager, seat);
 
     struct xkb_context *context = xkb_context_new (XKB_CONTEXT_NO_FLAGS);
     const struct xkb_rule_names names = {.layout = "us"};
@@ -206,14 +218,19 @@ int main (int argc, char **argv) {
         fprintf (stderr, "wl-type: no keymap\n");
         return 1;
     }
-    const size_t size = strlen (text) + 1;
-    const int fd = memfd_create ("wl-type-keymap", MFD_CLOEXEC);
-    if (fd < 0 || write (fd, text, size) != (ssize_t) size) {
-        perror ("wl-type: keymap");
-        return 1;
+    if (manager) {
+        keyboard = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard (manager, seat);
+        const size_t size = strlen (text) + 1;
+        const int fd = memfd_create ("wl-type-keymap", MFD_CLOEXEC);
+        if (fd < 0 || write (fd, text, size) != (ssize_t) size) {
+            perror ("wl-type: keymap");
+            return 1;
+        }
+        zwp_virtual_keyboard_v1_keymap (keyboard, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, fd, size);
+        close (fd);
+    } else {
+        org_kde_kwin_fake_input_authenticate (fake_input, "wl-type", "HIME session tests");
     }
-    zwp_virtual_keyboard_v1_keymap (keyboard, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, fd, size);
-    close (fd);
     free (text);
     wl_display_roundtrip (display);
 
@@ -225,7 +242,9 @@ int main (int argc, char **argv) {
         }
     }
 
-    zwp_virtual_keyboard_v1_destroy (keyboard);
+    if (keyboard) {
+        zwp_virtual_keyboard_v1_destroy (keyboard);
+    }
     wl_display_roundtrip (display);
     wl_display_disconnect (display);
     return 0;

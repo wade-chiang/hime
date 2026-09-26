@@ -179,7 +179,7 @@ endif
 wl-im.o: $(WL_PROTOCOL_H)
 
 # keep the generated protocol code between builds
-.SECONDARY: $(WL_PROTOCOLS:%=%-protocol.c)
+.SECONDARY: $(WL_PROTOCOLS:%=%-protocol.c) fake-input-protocol.c
 
 hime_tsin_o = tsin.o tsin-util.o win0.o win1.o tsin-parse.o
 OBJS       += $(hime_tsin_o)
@@ -303,9 +303,10 @@ $(QT6_TEXT_INPUT_TEST): ../tests/session/qt-text-input-test.cpp
 	$(CXX) -std=c++17 -Wall -fPIC -o $@ $< `pkg-config --cflags --libs Qt6Widgets`
 
 $(WL_TYPE): ../tests/session/wl-type.c virtual-keyboard-unstable-v1-client-protocol.h \
-		virtual-keyboard-unstable-v1-protocol.c
+		virtual-keyboard-unstable-v1-protocol.c fake-input-client-protocol.h \
+		fake-input-protocol.c
 	$(CC) -Wall -I. -o $@ $< virtual-keyboard-unstable-v1-protocol.c \
-		`pkg-config --cflags --libs wayland-client xkbcommon`
+		fake-input-protocol.c `pkg-config --cflags --libs wayland-client xkbcommon`
 
 WL_IM_TESTS =
 if USE_WAYLAND_IM

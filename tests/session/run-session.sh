@@ -24,6 +24,11 @@
 # Wayland backend.  Screenshots can be taken with grim.  With
 # HIME_SESSION_OUTPUTS=2 it has two 1280x800 outputs side by side.
 #
+# With HIME_SESSION_COMPOSITOR=kwin it is a headless KWin (virtual
+# backend, QPainter, no Xwayland), which starts the daemon itself as its
+# input method (--inputmethod), as Plasma does; key injection and
+# screenshots are allowed (KWIN_*_NO_PERMISSION_CHECKS).
+#
 # GTK and Qt applications pick up the HIME IM modules from the build tree.
 # With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
 # Xwayland instead.
@@ -37,6 +42,7 @@ top="$(cd "$here/../.." && pwd)"
 if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     compositor=mutter
     [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]] && compositor=sway
+    [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]] && compositor=kwin_wayland
     for bin in "$compositor" dbus-run-session; do
         if ! command -v "$bin" >/dev/null; then
             echo "run-session.sh: $bin not found" >&2
@@ -91,7 +97,22 @@ fi
 tmp="$HIME_SESSION_TMP"
 log="$tmp/compositor.log"
 
-if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
+# The daemon: HIME_DAEMON makes it daemonize, as when a client starts it.
+# It sees the session as a desktop would show it (Wayland, plus X on
+# mutter) and picks its backend itself: X11 on mutter, Wayland on sway,
+# which has layer-shell.  HIME_TEST_HOOKS: tests/session/notify-check.sh
+# drives mouse actions.
+daemon_env=(HIME_TABLE_DIR="$top/data" HIME_TEST_HOOKS=1 HIME_MODULE_DIR="$top/src/modules")
+
+if [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]]; then
+    # KWin starts the daemon (in the foreground) on a connection of its own
+    KWIN_COMPOSE=Q KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 \
+        KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 \
+        KWIN_XKB_DEFAULT_KEYMAP=true XKB_DEFAULT_LAYOUT=us \
+        kwin_wayland --virtual --width 1280 --height 800 --socket wl-hime-test \
+        --no-lockscreen --no-global-shortcuts --no-kactivities \
+        --inputmethod "env ${daemon_env[*]} $top/src/hime" >"$log" 2>&1 &
+elif [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
     printf '%s\n' 'output HEADLESS-1 resolution 1280x800 position 0 0' \
         'output HEADLESS-2 resolution 1280x800 position 1280 0' \
         'xwayland disable' >"$tmp/sway.config"
@@ -135,6 +156,8 @@ wait_for() {
 
 if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
     started='compgen -G "$XDG_RUNTIME_DIR/wayland-[0-9]" >/dev/null'
+elif [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]]; then
+    started='[[ -S "$XDG_RUNTIME_DIR/wl-hime-test" ]]'
 else
     started='[[ -S "$XDG_RUNTIME_DIR/wl-hime-test" ]] && grep -q "public X11 display" "$log"'
 fi
@@ -152,25 +175,19 @@ fi
 x_display="$(sed -n 's/.*Using public X11 display \(:[0-9]*\).*/\1/p' "$log" | head -1)"
 x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1 || true)"
 
-# The daemon still needs X for its windows; it picks the X11 backend
-# itself, which run-session.sh relies on by not setting GDK_BACKEND.
-# HIME_DAEMON makes it daemonize, as when a client starts it.  It sees the
-# session as a desktop would show it (Wayland, plus X on mutter) and picks
-# its backend itself: X11 on mutter, Wayland on sway, which has layer-shell.
-# HIME_TEST_HOOKS: tests/session/notify-check.sh drives mouse actions
-daemon_env=(WAYLAND_DISPLAY="$wl_display" HIME_DAEMON=1 HIME_TABLE_DIR="$top/data"
-    HIME_TEST_HOOKS=1
-    HIME_MODULE_DIR="$top/src/modules")
+daemon_env+=(WAYLAND_DISPLAY="$wl_display" HIME_DAEMON=1)
 if [[ "${HIME_SESSION_DAEMON_BACKEND:-}" == wayland ]]; then
     daemon_env+=(HIME_BACKEND=wayland)
 elif [[ -n "$x_display" ]]; then
     daemon_env+=(DISPLAY="$x_display" XAUTHORITY="$x_auth")
 fi
-env -u DISPLAY "${daemon_env[@]}" "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
+if [[ "${HIME_SESSION_COMPOSITOR:-}" != kwin ]]; then
+    env -u DISPLAY "${daemon_env[@]}" "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
+fi
 
 if ! wait_for '[[ -S "$XDG_RUNTIME_DIR/hime/hime.socket" ]]'; then
     echo "run-session.sh: hime did not open its socket" >&2
-    cat "$tmp/hime.log" >&2
+    cat "$tmp/hime.log" "$log" >&2 2>/dev/null || true
     exit 1
 fi
 
