@@ -632,6 +632,72 @@ static void create_input_method (void) {
     dbg ("wl-im: input method created\n");
 }
 
+// OverSpot: the input window of a text-input field is an input popup
+// surface, which the compositor places next to the text cursor.
+
+gboolean wl_im_popup_wanted (void) {
+    return hime_input_style == InputStyleOverSpot && wl_im_ready ();
+}
+
+static void popup_text_input_rectangle (void *data, struct zwp_input_popup_surface_v2 *popup,
+                                        int32_t x, int32_t y, int32_t width, int32_t height) {
+    dbg ("wl-im: text input rectangle %d,%d %dx%d\n", x, y, width, height);
+}
+
+static const struct zwp_input_popup_surface_v2_listener popup_listener = {
+    popup_text_input_rectangle,
+};
+
+// Each time the window is shown, GDK creates its wl_surface again: give it
+// the role then, after GtkWindow's map, before the surface is committed.
+static void popup_map (GtkWidget *win, gpointer data) {
+    struct wl_surface *surface = gdk_wayland_window_get_wl_surface (gtk_widget_get_window (win));
+    if (!surface || !im) {
+        return;
+    }
+    struct zwp_input_popup_surface_v2 *popup =
+        zwp_input_method_v2_get_input_popup_surface (im, surface);
+    zwp_input_popup_surface_v2_add_listener (popup, &popup_listener, NULL);
+    g_object_set_data_full (G_OBJECT (win), "hime-popup-surface", popup,
+                            (GDestroyNotify) zwp_input_popup_surface_v2_destroy);
+}
+
+// A window with the popup role.  GtkWindow's unmap destroys the
+// wl_surface, and destroying it before its role is a protocol error: drop
+// the role first.  (Handlers and emission hooks of the signal run too late,
+// after the class handler, which gtk-layer-shell also overrides.)
+typedef struct {
+    GtkWindow parent;
+} HimePopupWindow;
+
+typedef struct {
+    GtkWindowClass parent_class;
+} HimePopupWindowClass;
+
+G_DEFINE_TYPE (HimePopupWindow, hime_popup_window, GTK_TYPE_WINDOW)
+
+static void hime_popup_window_unmap (GtkWidget *win) {
+    g_object_set_data (G_OBJECT (win), "hime-popup-surface", NULL);
+    GTK_WIDGET_CLASS (hime_popup_window_parent_class)->unmap (win);
+}
+
+static void hime_popup_window_class_init (HimePopupWindowClass *klass) {
+    GTK_WIDGET_CLASS (klass)->unmap = hime_popup_window_unmap;
+}
+
+static void hime_popup_window_init (HimePopupWindow *win) {
+}
+
+GtkWidget *wl_im_popup_window_new (void) {
+    GtkWidget *win = g_object_new (hime_popup_window_get_type (), "type", GTK_WINDOW_TOPLEVEL, NULL);
+    gtk_widget_realize (win);
+    // no xdg role: the window gets the popup role when it is mapped
+    gdk_wayland_window_set_use_custom_surface (gtk_widget_get_window (win));
+    g_signal_connect_after (win, "map", G_CALLBACK (popup_map), NULL);
+    g_object_set_data (G_OBJECT (win), "hime-popup", GINT_TO_POINTER (TRUE));
+    return win;
+}
+
 static void registry_global (void *data, struct wl_registry *registry, uint32_t name,
                              const char *interface, uint32_t version) {
     if (!strcmp (interface, zwp_input_method_manager_v2_interface.name)) {

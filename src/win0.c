@@ -68,8 +68,7 @@ static void recreate_win0 () {
 void init_win0 () {
     if (win0)
         return;
-    win0 = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-    hime_window_init (win0, TRUE);
+    win0 = hime_input_window_new ();
     gtk_window_set_has_resize_grip (GTK_WINDOW (win0), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (win0), 0);
     gtk_widget_realize (win0);

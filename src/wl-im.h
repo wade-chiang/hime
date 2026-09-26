@@ -28,10 +28,17 @@ void wl_im_init (void);
 gboolean wl_im_ready (void);
 // send the committed text and the preedit to it
 void wl_im_send (void);
+// Should an input window be an input popup (OverSpot, a text-input field
+// focused)?
+gboolean wl_im_popup_wanted (void);
+// a new (realized) window that becomes one when shown
+GtkWidget *wl_im_popup_window_new (void);
 #else
 static inline void wl_im_init (void) {}
 static inline gboolean wl_im_ready (void) { return FALSE; }
 static inline void wl_im_send (void) {}
+static inline gboolean wl_im_popup_wanted (void) { return FALSE; }
+static inline GtkWidget *wl_im_popup_window_new (void) { return NULL; }
 #endif
 
 #endif /* HIME_WL_IM_H */

@@ -186,6 +186,8 @@ gboolean hime_use_layer_shell (void);
 void hime_window_init (GtkWidget *win, gboolean positioned);
 void hime_window_move (GtkWidget *win, int x, int y);
 void hime_window_get_position (GtkWidget *win, int *x, int *y);
+GtkWidget *hime_input_window_new (void);
+gboolean hime_input_window_stale (GtkWidget *win);
 GdkDisplay *get_default_display (void);
 #if GTK_CHECK_VERSION(3, 0, 0)
 GdkMonitor *get_primary_monitor (void);
@@ -223,6 +225,7 @@ int current_fullwidth_mode (void);
 void clear_output_buffer (void);
 void flush_edit_buffer (void);
 void hide_in_win (ClientState *cs);
+void refresh_input_window (void);
 void hime_reset (void);
 void init_state_chinese (ClientState *cs);
 void save_CS_temp_to_current (void);

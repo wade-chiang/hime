@@ -20,6 +20,7 @@
 #include "hime.h"
 
 #include "win-common.h"
+#include "wl-im.h"
 
 #if HIME_LAYER_SHELL
 #include <gtk-layer-shell.h>
@@ -70,7 +71,36 @@ void hime_window_init (GtkWidget *win, gboolean positioned) {
 #endif
 }
 
+static gboolean is_popup (GtkWidget *win) {
+    return g_object_get_data (G_OBJECT (win), "hime-popup") != NULL;
+}
+
+// A new window for the main input windows (the ones following the text
+// cursor in OverSpot): an input popup surface while a Wayland text-input
+// field is focused, placed by the compositor; otherwise as with
+// hime_window_init (win, TRUE).
+GtkWidget *hime_input_window_new (void) {
+    if (wl_im_popup_wanted ()) {
+        return wl_im_popup_window_new ();
+    }
+    GtkWidget *win = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    hime_window_init (win, TRUE);
+    return win;
+}
+
+// Is WIN, from hime_input_window_new (), the wrong kind of window now (the
+// focus moved between a text-input field and a HIME client, or the input
+// style changed)?  It has to be created again: a window cannot change.
+gboolean hime_input_window_stale (GtkWidget *win) {
+    return win && is_popup (win) != wl_im_popup_wanted ();
+}
+
 void hime_window_move (GtkWidget *win, int x, int y) {
+    if (is_popup (win)) {
+        // the compositor places it; shrink it to what it shows now
+        gtk_window_resize (GTK_WINDOW (win), 1, 1);
+        return;
+    }
 #if HIME_LAYER_SHELL
     if (hime_use_layer_shell ()) {
         GtkWindow *window = GTK_WINDOW (win);
@@ -86,6 +116,12 @@ void hime_window_move (GtkWidget *win, int x, int y) {
 }
 
 void hime_window_get_position (GtkWidget *win, int *x, int *y) {
+    if (is_popup (win)) {
+        // unknown: windows placed next to it go to the fixed position
+        *x = hime_root_x;
+        *y = hime_root_y;
+        return;
+    }
 #if HIME_LAYER_SHELL
     if (hime_use_layer_shell ()) {
         *x = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (win), "hime-x"));

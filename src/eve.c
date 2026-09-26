@@ -418,10 +418,48 @@ void check_CS () {
 
 void show_input_method_name_on_gtab ();
 
+extern GtkWidget *win_gtab, *win_pho;
+void move_in_win (ClientState *cs, int x, int y);
+
+// Create the input window of the current input method again if it is the
+// wrong kind now (hime_input_window_stale ()), e.g. after the input style
+// changed.  Module windows stay as they are.
+void refresh_input_window (void) {
+    switch (current_method_type ()) {
+    case method_type_PHO:
+        if (!hime_input_window_stale (win_pho)) {
+            return;
+        }
+        destroy_win_pho ();
+        init_win_pho ();
+        break;
+    case method_type_TSIN:
+        if (!hime_input_window_stale (win0)) {
+            return;
+        }
+        destroy_win0 ();
+        init_win0 ();
+        break;
+    case method_type_MODULE:
+        return;
+    default:
+        if (!hime_input_window_stale (win_gtab)) {
+            return;
+        }
+        destroy_win_gtab ();
+        init_win_gtab ();
+    }
+    // A layer surface is placed at the fixed position (the only one known
+    // on Wayland); the compositor places a popup
+    move_in_win (current_CS, hime_root_x, hime_root_y);
+}
+
 void show_in_win (ClientState *cs) {
     if (!cs) {
         return;
     }
+
+    refresh_input_window ();
 
     INMD *input_method = current_input_method ();
     if ((input_method->win_funcs).show_input_window)

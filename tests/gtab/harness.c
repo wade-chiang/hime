@@ -116,6 +116,9 @@ int win_gtab_max_key_press;
 void init_win_gtab (void) {
 }
 
+void destroy_win_gtab (void) {
+}
+
 gboolean is_win_gtab_visible (void) {
     return rec_win_visible;
 }
