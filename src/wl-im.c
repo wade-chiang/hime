@@ -16,22 +16,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-// The daemon as the seat's Wayland input method (input-method-unstable-v2,
-// as wlroots compositors, niri and Hyprland offer it).  Applications using
-// text-input-v3 (GTK 4 and Qt 6 without an IM module setting, GTK 3 with
+// The daemon as the seat's Wayland input method.  Applications using
+// text-input (GTK 4 and Qt 6 without an IM module setting, GTK 3 with
 // GTK_IM_MODULE=wayland, Firefox, Chromium with --enable-wayland-ime, ...)
 // then need no HIME module: while a text field is focused, the compositor
 // sends the keys here, and HIME commits text and sets the preedit through
-// the protocol.  Keys HIME does not handle go on to the application through
-// a virtual keyboard.
+// the protocol.  Keys HIME does not handle go on to the application.
 //
-// All such applications share one ClientState, like one X client.  The
-// input method runs on GDK's own Wayland connection: the compositor only
-// lets the virtual keyboard of the input method's own connection past the
-// keyboard grab.
-
-// memfd_create
-#define _GNU_SOURCE
+// This is the core; the protocols are input-method-v2 (wl-im-v2.c:
+// wlroots compositors, niri, Hyprland) and input-method-v1 (wl-im-v1.c:
+// KWin).  All text-input applications share one ClientState, like one X
+// client.  The input method runs on GDK's own Wayland connection: its
+// windows must be on the one of the input method (popups), and wlroots
+// only lets the virtual keyboard of that connection past the keyboard
+// grab.
 
 #include <string.h>
 #include <sys/mman.h>
@@ -44,45 +42,31 @@
 #include "hime.h"
 
 #include "hime-im-client.h"
-#include "input-method-unstable-v2-client-protocol.h"
-#include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "win-sym.h"
+#include "wl-im-private.h"
 #include "wl-im.h"
 
 // from eve.c
 extern char *output_buffer;
 extern uint32_t output_bufferN;
 
-// zwp_text_input_v3.content_purpose
-#define CONTENT_PURPOSE_PASSWORD 8
-#define CONTENT_PURPOSE_PIN 9
-
 // evdev key codes are below 256 (KEY_MAX is 0x2ff, but keyboards do not
 // send those)
 #define KEYS_N 0x300
 
-static struct zwp_input_method_manager_v2 *im_manager;
-static struct zwp_virtual_keyboard_manager_v1 *vk_manager;
-static struct zwp_input_method_v2 *im;
-static struct zwp_input_method_keyboard_grab_v2 *grab;
-static struct zwp_virtual_keyboard_v1 *vk;
+// wl_keyboard key_state repeated (since version 10), sent by KWin
+#define KEY_STATE_REPEATED 2
+
+// the protocol, once the compositor offers one
+static const WlImProtocol *protocol;
 
 static struct xkb_context *xkb_context;
 static struct xkb_keymap *keymap;
 static struct xkb_state *xkb_state;
-// the keymap the virtual keyboard has, as text
-static char *vk_keymap;
 
-// done events received, and those applied: commits carry the serial of
-// the state they were made for
-static uint32_t serial, applied_serial;
-// state since the last done event, and the state it applied; activated:
-// an activate came, also while active (a new field, or text input enabled
-// again: the application dropped its preedit)
-static gboolean pending_active, pending_activated, active;
-static uint32_t pending_purpose;
-// the field takes a password: pass all keys on
-static gboolean bypass;
+// the state applied: a text field is focused, and takes a password (pass
+// all keys on)
+static gboolean active, bypass;
 
 // the one ClientState of all text-input applications
 static ClientState wl_cs;
@@ -97,13 +81,14 @@ static guint8 pressed[KEYS_N];
 static guint8 forwarded[KEYS_N];
 
 // repeat of a held key that HIME handles (the application repeats the
-// keys it gets)
+// keys it gets), unless the compositor repeats keys itself (KWin)
 static int32_t repeat_rate = 25, repeat_delay = 600;
+static gboolean compositor_repeats;
 static guint repeat_source;
 static uint32_t repeat_key;
 
-// the modifiers held, as mirrored to the virtual keyboard
-static uint32_t vk_depressed, vk_latched;
+// the modifiers held, as passed on to the application
+static uint32_t forwarded_depressed, forwarded_latched;
 
 // Events of the grab and the input method, handled in order: showing a
 // window while handling a key can make GDK dispatch the next events (e.g.
@@ -111,27 +96,45 @@ static uint32_t vk_depressed, vk_latched;
 enum {
     EVENT_KEY,
     EVENT_MODIFIERS,
-    EVENT_DONE,
+    EVENT_STATE,
     EVENT_UNAVAILABLE,
 };
 typedef struct {
     int type;
     uint32_t arg[4];
+    gpointer token;
 } Event;
 static GQueue events = G_QUEUE_INIT;
 static gboolean handling;
 
 static void handle_events (void);
 
-static void queue_event (int type, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+static void queue_event (int type, uint32_t a, uint32_t b, uint32_t c, uint32_t d, gpointer token) {
     Event *event = g_new (Event, 1);
     event->type = type;
     event->arg[0] = a;
     event->arg[1] = b;
     event->arg[2] = c;
     event->arg[3] = d;
+    event->token = token;
     g_queue_push_tail (&events, event);
     handle_events ();
+}
+
+void wl_im_queue_state (gboolean new_active, gboolean password, gboolean activated, gpointer token) {
+    queue_event (EVENT_STATE, new_active, password, activated, 0, token);
+}
+
+void wl_im_queue_key (uint32_t time, uint32_t key, uint32_t state) {
+    queue_event (EVENT_KEY, time, key, state, 0, NULL);
+}
+
+void wl_im_queue_modifiers (uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group) {
+    queue_event (EVENT_MODIFIERS, depressed, latched, locked, group, NULL);
+}
+
+void wl_im_queue_unavailable (void) {
+    queue_event (EVENT_UNAVAILABLE, 0, 0, 0, 0, NULL);
 }
 
 static uint32_t now_ms (void) {
@@ -153,25 +156,6 @@ static uint32_t x_state (void) {
     return mask;
 }
 
-static void set_vk_keymap (const char *text) {
-    if (vk_keymap && !strcmp (vk_keymap, text)) {
-        return;
-    }
-    const size_t size = strlen (text) + 1;
-    const int fd = memfd_create ("hime-keymap", MFD_CLOEXEC);
-    if (fd < 0) {
-        return;
-    }
-    if (write (fd, text, size) != (ssize_t) size) {
-        close (fd);
-        return;
-    }
-    zwp_virtual_keyboard_v1_keymap (vk, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, fd, size);
-    close (fd);
-    g_free (vk_keymap);
-    vk_keymap = g_strdup (text);
-}
-
 static void use_keymap (struct xkb_keymap *new_keymap) {
     if (xkb_state) {
         xkb_state_unref (xkb_state);
@@ -182,11 +166,13 @@ static void use_keymap (struct xkb_keymap *new_keymap) {
     keymap = new_keymap;
     xkb_state = xkb_state_new (keymap);
 
-    // the virtual keyboard sends key codes of the same keymap
-    char *text = xkb_keymap_get_as_string (keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
-    if (text) {
-        set_vk_keymap (text);
-        free (text);
+    // e.g. the virtual keyboard sends key codes of the same keymap
+    if (protocol && protocol->keymap) {
+        char *text = xkb_keymap_get_as_string (keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
+        if (text) {
+            protocol->keymap (text);
+            free (text);
+        }
     }
 }
 
@@ -202,18 +188,41 @@ static gboolean have_keymap (void) {
     return TRUE;
 }
 
+void wl_im_grab_keymap (uint32_t format, int32_t fd, uint32_t size) {
+    if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 || !size) {
+        close (fd);
+        return;
+    }
+    char *text = mmap (NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close (fd);
+    if (text == MAP_FAILED) {
+        return;
+    }
+    struct xkb_keymap *new_keymap = xkb_keymap_new_from_buffer (
+        xkb_context, text, strnlen (text, size), XKB_KEYMAP_FORMAT_TEXT_V1, 0);
+    munmap (text, size);
+    if (new_keymap) {
+        use_keymap (new_keymap);
+    }
+}
+
+void wl_im_grab_repeat_info (int32_t rate, int32_t delay) {
+    // KWin sends rate 0 when it repeats keys itself
+    repeat_rate = rate;
+    repeat_delay = delay;
+}
+
 // Send the text HIME committed and the preedit to the application.
 static void flush (void) {
-    if (!im || !active) {
+    if (!protocol || !active) {
         // nowhere to commit it: do not leave it for a HIME client's reply
         clear_output_buffer ();
         return;
     }
 
-    gboolean changed = FALSE;
+    char *text = NULL;
     if (output_bufferN) {
-        zwp_input_method_v2_commit_string (im, output_buffer);
-        changed = TRUE;
+        text = g_strdup (output_buffer);
     }
     clear_output_buffer ();
 
@@ -246,6 +255,7 @@ static void flush (void) {
     }
     const int cursor_bytes = g_utf8_offset_to_pointer (str, cursor) - str;
 
+    gboolean changed = text != NULL;
     if (g_strcmp0 (shown_preedit, str) || shown_cursor != cursor_bytes) {
         g_free (shown_preedit);
         shown_preedit = g_strdup (str);
@@ -253,18 +263,14 @@ static void flush (void) {
         changed = TRUE;
     }
 
-    if (!changed) {
-        return;
+    if (changed) {
+        protocol->send (text, shown_preedit, shown_cursor);
     }
-    // A commit applies all pending state, and an unset preedit is empty
-    if (shown_preedit[0]) {
-        zwp_input_method_v2_set_preedit_string (im, shown_preedit, shown_cursor, shown_cursor);
-    }
-    zwp_input_method_v2_commit (im, applied_serial);
+    g_free (text);
 }
 
 gboolean wl_im_ready (void) {
-    return im && active && hime_focused_client () == &wl_cs;
+    return protocol && active && hime_focused_client () == &wl_cs;
 }
 
 void wl_im_send (void) {
@@ -274,9 +280,9 @@ void wl_im_send (void) {
 }
 
 static void forward_key (uint32_t time, uint32_t key, uint32_t state) {
-    zwp_virtual_keyboard_v1_key (vk, time, key, state);
+    protocol->forward_key (time, key, state);
     if (key < KEYS_N) {
-        forwarded[key] = state == WL_KEYBOARD_KEY_STATE_PRESSED;
+        forwarded[key] = state != WL_KEYBOARD_KEY_STATE_RELEASED;
     }
 }
 
@@ -299,7 +305,7 @@ static gboolean repeat_cb (gpointer data) {
     if (handling) {
         return G_SOURCE_CONTINUE;
     }
-    if (!active || bypass) {
+    if (!protocol || !active || bypass) {
         repeat_source = 0;
         return G_SOURCE_REMOVE;
     }
@@ -345,9 +351,30 @@ static void key_press (uint32_t time, uint32_t key) {
         return;
     }
 
-    if (repeat_rate > 0 && xkb_keymap_key_repeats (keymap, key + 8)) {
+    if (!compositor_repeats && repeat_rate > 0 && xkb_keymap_key_repeats (keymap, key + 8)) {
         repeat_key = key;
         repeat_source = g_timeout_add (repeat_delay, repeat_cb, GINT_TO_POINTER (TRUE));
+    }
+}
+
+// The compositor repeats a held key (KWin): as our own repeat
+static void key_repeated (uint32_t time, uint32_t key) {
+    if (!compositor_repeats) {
+        compositor_repeats = TRUE;
+        stop_repeat ();
+    }
+    if (key < KEYS_N && forwarded[key]) {
+        forward_key (time, key, KEY_STATE_REPEATED);
+        return;
+    }
+    if (bypass || (key < KEYS_N && !pressed[key])) {
+        return;
+    }
+    const gboolean eaten = process_press (key);
+    flush ();
+    if (!eaten) {
+        // the application takes over
+        forward_key (time, key, WL_KEYBOARD_KEY_STATE_PRESSED);
     }
 }
 
@@ -374,67 +401,17 @@ static void key_release (uint32_t time, uint32_t key) {
     }
 }
 
-static void grab_keymap (void *data, struct zwp_input_method_keyboard_grab_v2 *g,
-                         uint32_t format, int32_t fd, uint32_t size) {
-    if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 || !size) {
-        close (fd);
-        return;
-    }
-    char *text = mmap (NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    close (fd);
-    if (text == MAP_FAILED) {
-        return;
-    }
-    struct xkb_keymap *new_keymap = xkb_keymap_new_from_buffer (
-        xkb_context, text, strnlen (text, size), XKB_KEYMAP_FORMAT_TEXT_V1, 0);
-    munmap (text, size);
-    if (new_keymap) {
-        use_keymap (new_keymap);
-    }
-}
-
-static void grab_key (void *data, struct zwp_input_method_keyboard_grab_v2 *g,
-                      uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
-    queue_event (EVENT_KEY, time, key, state, 0);
-}
-
-static void grab_modifiers (void *data, struct zwp_input_method_keyboard_grab_v2 *g,
-                            uint32_t serial, uint32_t depressed, uint32_t latched,
-                            uint32_t locked, uint32_t group) {
-    queue_event (EVENT_MODIFIERS, depressed, latched, locked, group);
-}
-
-static void grab_repeat_info (void *data, struct zwp_input_method_keyboard_grab_v2 *g,
-                              int32_t rate, int32_t delay) {
-    repeat_rate = rate;
-    repeat_delay = delay;
-}
-
-static const struct zwp_input_method_keyboard_grab_v2_listener grab_listener = {
-    grab_keymap,
-    grab_key,
-    grab_modifiers,
-    grab_repeat_info,
-};
-
 // The compositor sends all keys to a grab, also those of applications with
 // a HIME module: grab only while a text-input field is focused.
 static void start_grab (void) {
     memset (pressed, 0, sizeof (pressed));
-    if (!im) {
-        return;
-    }
-    grab = zwp_input_method_v2_grab_keyboard (im);
-    zwp_input_method_keyboard_grab_v2_add_listener (grab, &grab_listener, NULL);
+    protocol->grab (TRUE);
 }
 
 static void stop_grab (void) {
     stop_repeat ();
-    if (grab) {
-        zwp_input_method_keyboard_grab_v2_release (grab);
-        grab = NULL;
-    }
-    // do not leave keys held down in the virtual keyboard
+    protocol->grab (FALSE);
+    // do not leave keys held down
     const uint32_t time = now_ms ();
     for (uint32_t key = 0; key < KEYS_N; key++) {
         if (forwarded[key]) {
@@ -443,12 +420,12 @@ static void stop_grab (void) {
     }
     // Only if some are held: the focus may have moved on already, and the
     // new window would see them released
-    if (xkb_state && (vk_depressed || vk_latched)) {
-        zwp_virtual_keyboard_v1_modifiers (
-            vk, 0, 0,
+    if (xkb_state && (forwarded_depressed || forwarded_latched)) {
+        protocol->forward_modifiers (
+            0, 0,
             xkb_state_serialize_mods (xkb_state, XKB_STATE_MODS_LOCKED),
             xkb_state_serialize_layout (xkb_state, XKB_STATE_LAYOUT_EFFECTIVE));
-        vk_depressed = vk_latched = 0;
+        forwarded_depressed = forwarded_latched = 0;
     }
 }
 
@@ -494,58 +471,34 @@ static void focus_out (void) {
     current_CS = cs ? cs : &wl_cs;
 }
 
-static void im_activate (void *data, struct zwp_input_method_v2 *m) {
-    pending_active = TRUE;
-    pending_activated = TRUE;
-    // activate resets the state
-    pending_purpose = 0;
-}
-
-static void im_deactivate (void *data, struct zwp_input_method_v2 *m) {
-    pending_active = FALSE;
-}
-
-static void im_surrounding_text (void *data, struct zwp_input_method_v2 *m,
-                                 const char *text, uint32_t cursor, uint32_t anchor) {
-}
-
-static void im_text_change_cause (void *data, struct zwp_input_method_v2 *m, uint32_t cause) {
-}
-
-static void im_content_type (void *data, struct zwp_input_method_v2 *m,
-                             uint32_t hint, uint32_t purpose) {
-    pending_purpose = purpose;
-}
-
-static void im_done (void *data, struct zwp_input_method_v2 *m) {
-    serial++;
-    queue_event (EVENT_DONE, pending_active, pending_purpose, pending_activated, serial);
-    pending_activated = FALSE;
-}
-
-static void apply_state (gboolean new_active, uint32_t purpose, gboolean activated,
-                         uint32_t done_serial) {
-    const gboolean was_active = active;
-    const gboolean was_bypass = bypass;
-    applied_serial = done_serial;
-    if (!im) {
+static void apply_state (gboolean new_active, gboolean password, gboolean activated, gpointer token) {
+    if (!protocol) {
         return;
     }
-    active = new_active;
-    bypass = purpose == CONTENT_PURPOSE_PASSWORD || purpose == CONTENT_PURPOSE_PIN;
+    const gboolean was_active = active;
+    const gboolean was_bypass = bypass;
 
-    dbg ("wl-im: done %u, active %d, purpose %u\n", done_serial, active, purpose);
+    dbg ("wl-im: active %d, password %d, activated %d\n", new_active, password, activated);
 
-    if (active != was_active || bypass != was_bypass || activated) {
+    if (new_active != was_active || password != was_bypass || activated) {
         stop_repeat ();
     }
-    if (active && !was_active) {
+    // with the state it was taken for
+    if (was_active && (!new_active || activated)) {
+        stop_grab ();
+    }
+    active = new_active;
+    bypass = password;
+    if (protocol->state) {
+        protocol->state (token);
+    }
+
+    if (active && (!was_active || activated)) {
         start_grab ();
         focus_in ();
     } else if (!active && was_active) {
-        stop_grab ();
         focus_out ();
-    } else if (active && (bypass != was_bypass || activated)) {
+    } else if (active && bypass != was_bypass) {
         focus_in ();
     }
 }
@@ -558,8 +511,7 @@ static void become_unavailable (void) {
         focus_out ();
         active = FALSE;
     }
-    zwp_input_method_v2_destroy (im);
-    im = NULL;
+    protocol = NULL;
 }
 
 static void handle_events (void) {
@@ -573,29 +525,31 @@ static void handle_events (void) {
         switch (event->type) {
         case EVENT_KEY:
             // keys queued before the grab was released
-            if (!active || !have_keymap ()) {
+            if (!protocol || !active || !have_keymap ()) {
                 break;
             }
             if (arg[2] == WL_KEYBOARD_KEY_STATE_PRESSED) {
                 key_press (arg[0], arg[1]);
+            } else if (arg[2] == KEY_STATE_REPEATED) {
+                key_repeated (arg[0], arg[1]);
             } else {
                 key_release (arg[0], arg[1]);
             }
             break;
         case EVENT_MODIFIERS:
-            if (!have_keymap ()) {
+            if (!protocol || !have_keymap ()) {
                 break;
             }
             xkb_state_update_mask (xkb_state, arg[0], arg[1], arg[2], 0, 0, arg[3]);
-            zwp_virtual_keyboard_v1_modifiers (vk, arg[0], arg[1], arg[2], arg[3]);
-            vk_depressed = arg[0];
-            vk_latched = arg[1];
+            protocol->forward_modifiers (arg[0], arg[1], arg[2], arg[3]);
+            forwarded_depressed = arg[0];
+            forwarded_latched = arg[1];
             break;
-        case EVENT_DONE:
-            apply_state (arg[0], arg[1], arg[2], arg[3]);
+        case EVENT_STATE:
+            apply_state (arg[0], arg[1], arg[2], event->token);
             break;
         case EVENT_UNAVAILABLE:
-            if (im) {
+            if (protocol) {
                 become_unavailable ();
             }
             break;
@@ -605,61 +559,31 @@ static void handle_events (void) {
     handling = FALSE;
 }
 
-static void im_unavailable (void *data, struct zwp_input_method_v2 *m) {
-    queue_event (EVENT_UNAVAILABLE, 0, 0, 0, 0);
-}
-
-static const struct zwp_input_method_v2_listener im_listener = {
-    im_activate,
-    im_deactivate,
-    im_surrounding_text,
-    im_text_change_cause,
-    im_content_type,
-    im_done,
-    im_unavailable,
-};
-
-static void create_input_method (void) {
-    GdkDisplay *display = gdk_display_get_default ();
-    struct wl_seat *seat = gdk_wayland_seat_get_wl_seat (gdk_display_get_default_seat (display));
-    if (!seat) {
-        return;
-    }
-    xkb_context = xkb_context_new (XKB_CONTEXT_NO_FLAGS);
-    im = zwp_input_method_manager_v2_get_input_method (im_manager, seat);
-    zwp_input_method_v2_add_listener (im, &im_listener, NULL);
-    vk = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard (vk_manager, seat);
+void wl_im_start (const WlImProtocol *new_protocol) {
+    protocol = new_protocol;
     dbg ("wl-im: input method created\n");
 }
 
-// OverSpot: the input window of a text-input field is an input popup
-// surface, which the compositor places next to the text cursor.
+struct wl_seat *wl_im_seat (void) {
+    GdkDisplay *display = gdk_display_get_default ();
+    return gdk_wayland_seat_get_wl_seat (gdk_display_get_default_seat (display));
+}
+
+// OverSpot: the input window of a text-input field is a popup surface of
+// the input method, which the compositor places next to the text cursor.
 
 gboolean wl_im_popup_wanted (void) {
-    return hime_input_style == InputStyleOverSpot && wl_im_ready ();
+    return hime_input_style == InputStyleOverSpot && wl_im_ready () && protocol->popup;
 }
-
-static void popup_text_input_rectangle (void *data, struct zwp_input_popup_surface_v2 *popup,
-                                        int32_t x, int32_t y, int32_t width, int32_t height) {
-    dbg ("wl-im: text input rectangle %d,%d %dx%d\n", x, y, width, height);
-}
-
-static const struct zwp_input_popup_surface_v2_listener popup_listener = {
-    popup_text_input_rectangle,
-};
 
 // Each time the window is shown, GDK creates its wl_surface again: give it
 // the role then, after GtkWindow's map, before the surface is committed.
 static void popup_map (GtkWidget *win, gpointer data) {
     struct wl_surface *surface = gdk_wayland_window_get_wl_surface (gtk_widget_get_window (win));
-    if (!surface || !im) {
+    if (!surface || !protocol || !protocol->popup) {
         return;
     }
-    struct zwp_input_popup_surface_v2 *popup =
-        zwp_input_method_v2_get_input_popup_surface (im, surface);
-    zwp_input_popup_surface_v2_add_listener (popup, &popup_listener, NULL);
-    g_object_set_data_full (G_OBJECT (win), "hime-popup-surface", popup,
-                            (GDestroyNotify) zwp_input_popup_surface_v2_destroy);
+    protocol->popup (win, surface);
 }
 
 // A window with the popup role.  GtkWindow's unmap destroys the
@@ -700,13 +624,11 @@ GtkWidget *wl_im_popup_window_new (void) {
 
 static void registry_global (void *data, struct wl_registry *registry, uint32_t name,
                              const char *interface, uint32_t version) {
-    if (!strcmp (interface, zwp_input_method_manager_v2_interface.name)) {
-        im_manager = wl_registry_bind (registry, name, &zwp_input_method_manager_v2_interface, 1);
-    } else if (!strcmp (interface, zwp_virtual_keyboard_manager_v1_interface.name)) {
-        vk_manager = wl_registry_bind (registry, name, &zwp_virtual_keyboard_manager_v1_interface, 1);
+    if (!xkb_context) {
+        xkb_context = xkb_context_new (XKB_CONTEXT_NO_FLAGS);
     }
-    if (im_manager && vk_manager && !im && !xkb_context) {
-        create_input_method ();
+    if (!wl_im_v2_global (registry, name, interface, version)) {
+        wl_im_v1_global (registry, name, interface, version);
     }
 }
 

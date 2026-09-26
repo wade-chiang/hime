@@ -1,12 +1,17 @@
 # Wayland protocols
 
-Protocols the daemon uses that `wayland-protocols` does not ship, copied
-unchanged from wlroots (https://gitlab.freedesktop.org/wlroots/wlroots,
-`protocol/`), under the MIT license in each file:
+Protocols the daemon uses, copied unchanged.  From wlroots
+(https://gitlab.freedesktop.org/wlroots/wlroots, `protocol/`), which
+`wayland-protocols` does not ship, under the MIT license in each file:
 
 - `input-method-unstable-v2.xml`: the daemon as the seat's input method.
 - `virtual-keyboard-unstable-v1.xml`: passing keys the input method does
   not handle on to the application.
+
+From wayland-protocols (https://gitlab.freedesktop.org/wayland/wayland-protocols,
+`unstable/input-method/`, MIT license in the file):
+
+- `input-method-unstable-v1.xml`: the daemon as KWin's input method.
 
 The build generates their client code with `wayland-scanner`.
 
