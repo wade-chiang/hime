@@ -13,6 +13,9 @@
 #
 # The daemon's config can be adjusted with HIME_CONF="name=value ..."
 #
+# With HIME_SESSION_DAEMON_BACKEND=wayland the daemon runs on GDK's Wayland
+# backend with no X display at all.
+#
 # GTK and Qt applications pick up the HIME IM modules from the build tree.
 # With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
 # Xwayland instead.
@@ -99,9 +102,15 @@ x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1)"
 # The daemon still needs X for its windows; it picks the X11 backend
 # itself, which run-session.sh relies on by not setting GDK_BACKEND.
 # HIME_DAEMON makes it daemonize, as when a client starts it.
-DISPLAY="$x_display" XAUTHORITY="$x_auth" HIME_DAEMON=1 \
-    HIME_TABLE_DIR="$top/data" \
-    "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
+if [[ "${HIME_SESSION_DAEMON_BACKEND:-}" == wayland ]]; then
+    env -u DISPLAY WAYLAND_DISPLAY=wl-hime-test HIME_BACKEND=wayland HIME_DAEMON=1 \
+        HIME_TABLE_DIR="$top/data" \
+        "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
+else
+    DISPLAY="$x_display" XAUTHORITY="$x_auth" HIME_DAEMON=1 \
+        HIME_TABLE_DIR="$top/data" \
+        "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
+fi
 
 if ! wait_for '[[ -S "$XDG_RUNTIME_DIR/hime/hime.socket" ]]'; then
     echo "run-session.sh: hime did not open its socket" >&2

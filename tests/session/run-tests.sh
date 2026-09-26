@@ -12,8 +12,9 @@
 #   @tool NAME      run src/NAME (a hime tool, as a Wayland client) first
 #   @exit N         the client's expected exit status (default 0)
 #   @env VAR=VALUE  set an environment variable for the client
+#   @daemon-wayland run the daemon on GDK's Wayland backend, without X
 #
-# Usage: run-tests.sh [--update]
+# Usage: run-tests.sh [--update] [CASE.keys...]
 # Exits 77 (skipped) when mutter is not available.
 
 set -euo pipefail
@@ -22,7 +23,16 @@ here="$(cd "$(dirname "$0")" && pwd)"
 top="$(cd "$here/../.." && pwd)"
 
 update=0
-[[ "${1:-}" == "--update" ]] && update=1
+if [[ "${1:-}" == "--update" ]]; then
+    update=1
+    shift
+fi
+
+if [[ $# -gt 0 ]]; then
+    cases=("$@")
+else
+    cases=("$here"/cases/*.keys)
+fi
 
 if ! command -v mutter >/dev/null; then
     echo "session tests: skipped (mutter not found)"
@@ -35,7 +45,7 @@ trap 'rm -rf "$tmp"' EXIT
 pass=0
 fail=0
 skip=0
-for keys in "$here"/cases/*.keys; do
+for keys in "${cases[@]}"; do
     name="$(basename "$keys" .keys)"
     expected="${keys%.keys}.expected"
     read -ra args <<<"$(grep -v -e "^#" -e "^@" "$keys" | tr "\n" " ")"
@@ -45,6 +55,7 @@ for keys in "$here"/cases/*.keys; do
     tool=""
     exit_status=0
     envs=()
+    daemon_backend=""
     while read -r directive arg; do
         case "$directive" in
         @program) program="$arg" ;;
@@ -52,6 +63,7 @@ for keys in "$here"/cases/*.keys; do
         @tool) tool="$arg" ;;
         @exit) exit_status="$arg" ;;
         @env) envs+=("$arg") ;;
+        @daemon-wayland) daemon_backend=wayland ;;
         esac
     done < <(grep '^@' "$keys")
 
@@ -70,7 +82,8 @@ for keys in "$here"/cases/*.keys; do
     fi
 
     status=0
-    HIME_SESSION_X11="$x11" "$here/run-session.sh" "${cmd[@]}" \
+    HIME_SESSION_X11="$x11" HIME_SESSION_DAEMON_BACKEND="$daemon_backend" \
+        "$here/run-session.sh" "${cmd[@]}" \
         >"$tmp/$name.actual" 2>"$tmp/$name.stderr" || status=$?
     if [[ $status -ne $exit_status ]]; then
         echo "FAIL $name (exit status $status, expected $exit_status)"

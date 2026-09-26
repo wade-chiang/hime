@@ -38,7 +38,11 @@ void bell (void) {
         return;
     }
 
-    XBell (dpy, hime_bell_volume);
+    if (dpy) {
+        XBell (dpy, hime_bell_volume);
+    } else {
+        gdk_display_beep (gdk_display_get_default ());
+    }
 }
 
 void case_inverse (KeySym *xkey, gboolean shift_is_pressed) {
@@ -150,7 +154,10 @@ void set_label_space (GtkWidget *label) {
 }
 
 void set_no_focus (GtkWidget *win) {
-    gdk_window_set_override_redirect (gtk_widget_get_window (win), TRUE);
+    // override-redirect is X11 only
+    if (dpy) {
+        gdk_window_set_override_redirect (gtk_widget_get_window (win), TRUE);
+    }
     gtk_window_set_accept_focus (GTK_WINDOW (win), FALSE);
     gtk_window_set_focus_on_map (GTK_WINDOW (win), FALSE);
     gtk_window_set_resizable (GTK_WINDOW (win), FALSE);
@@ -167,10 +174,12 @@ GdkDisplay *get_default_display (void) {
 // GTK+ 3.22 introduced GdkMonitor APIs, GdkScreen APIs were deprecated
 #if GTK_CHECK_VERSION(3, 0, 0)
 GdkMonitor *get_primary_monitor (void) {
-    GdkMonitor *primary_monitor = gdk_display_get_primary_monitor (
-        get_default_display ());
+    GdkDisplay *display = get_default_display ();
+    GdkMonitor *primary_monitor = gdk_display_get_primary_monitor (display);
     if (!primary_monitor) {
+        // Wayland has no primary monitor
         dbg ("gdk_display_get_primary_monitor returned NULL\n");
+        primary_monitor = gdk_display_get_monitor (display, 0);
     }
     return primary_monitor;
 }

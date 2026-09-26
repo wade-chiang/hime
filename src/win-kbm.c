@@ -175,7 +175,11 @@ static void mod_fg_all (GtkWidget *label, GdkRGBA *rgbfg) {
     gtk_widget_override_color (label, GTK_STATE_FLAG_PRELIGHT, rgbfg);
 }
 
+// XTest: only on X11
 static void send_fake_key_eve2 (const KeySym key, const gboolean press) {
+    if (!dpy) {
+        return;
+    }
     const KeyCode kc = XKeysymToKeycode (dpy, key);
     XTestFakeKeyEvent (dpy, kc, press, CurrentTime);
 }

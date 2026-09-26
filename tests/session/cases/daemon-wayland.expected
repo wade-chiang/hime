@@ -1,0 +1,17 @@
+b        eat 
+1        eat  commit="八"
+a        eat 
+<space>  eat  commit="一"
+c        eat 
+2        eat  commit="中"
+,        eat 
+,        eat 
+<space>  eat  commit="，"
+S-h      eat  commit="H"
+S-i      eat  commit="I"
+<space>  pass
+C-<space> eat 
+a        pass
+C-<space> eat 
+a        eat 
+<space>  eat  commit="一"

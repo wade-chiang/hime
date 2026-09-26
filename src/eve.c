@@ -77,7 +77,11 @@ INMD *current_input_method () {
     return &inmd[current_CS->in_method];
 }
 
+// XTest: only on X11; see send_text_call_back
 void send_fake_key_eve (KeySym key) {
+    if (!dpy) {
+        return;
+    }
     KeyCode kc = XKeysymToKeycode (dpy, key);
     XTestFakeKeyEvent (dpy, kc, True, CurrentTime);
     XTestFakeKeyEvent (dpy, kc, False, CurrentTime);
@@ -423,7 +427,7 @@ static int xerror_handler (Display *d, XErrorEvent *eve) {
 }
 
 void getRootXY (Window win, int wx, int wy, int *tx, int *ty) {
-    if (!win) {
+    if (!win || !dpy) {
         *tx = wx;
         *ty = wy;
         return;
@@ -441,9 +445,10 @@ void move_IC_in_win (ClientState *cs) {
 #endif
     Window inpwin = cs->client_win;
 
-    if (!inpwin) {
-        // Without an X window (a native Wayland client) the spot location
-        // cannot be mapped to the screen: use the fixed position.  Only for
+    if (!inpwin || !dpy) {
+        // Without an X window (a native Wayland client), or without an X
+        // display to map it on, the spot location cannot be mapped to the
+        // screen: use the fixed position.  Only for
         // the current HIME protocol client; an XIM IC without a window yet
         // must not move the input window of the focused one.
         if (cs->b_hime_protocol && cs == current_CS) {
@@ -483,7 +488,7 @@ void move_IC_in_win (ClientState *cs) {
 void update_in_win_pos (void) {
     check_CS ();
 
-    if (current_CS->input_style == InputStyleRoot) {
+    if (current_CS->input_style == InputStyleRoot && dpy) {
         Window r_root, r_child;
         int winx, winy, rootx, rooty;
         uint32_t mask;

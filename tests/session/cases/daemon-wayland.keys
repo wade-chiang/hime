@@ -1,0 +1,5 @@
+@daemon-wayland
+# The daemon on GDK's Wayland backend, with no X display: a client without
+# X types through it as usual.
+b 1 a <space> c 2 , , <space>
+S-h S-i <space> C-<space> a C-<space> a <space>

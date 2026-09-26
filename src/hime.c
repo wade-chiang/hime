@@ -50,7 +50,13 @@ char *half_char_to_full_char (KeySym xkey) {
     return _ (fullchar[xkey - ' ']);
 }
 
+// The hidden X window that owns the XIM server and the selections; there is
+// none without an X display.
 static void start_inmd_window () {
+    if (!dpy) {
+        return;
+    }
+
     GtkWidget *win = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     gtk_widget_realize (win);
     xim_xwin = GDK_WINDOW_XWINDOW (gtk_widget_get_window (win));
@@ -587,7 +593,10 @@ int main (int argc, char **argv) {
 #if GTK_CHECK_VERSION(3, 10, 0)
     // The daemon's windows and XIM still need X11; on a Wayland desktop run
     // on Xwayland even when started from a native Wayland client.
-    gdk_set_allowed_backends ("x11");
+    // HIME_BACKEND=wayland runs it on the Wayland backend instead, without
+    // XIM or anything else that needs an X display.
+    const char *backend = getenv ("HIME_BACKEND");
+    gdk_set_allowed_backends (backend && !strcmp (backend, "wayland") ? "wayland" : "x11");
 #endif
     gtk_init (&argc, &argv);
 
@@ -644,8 +653,9 @@ int main (int argc, char **argv) {
 
     dbg ("after gtk_init\n");
 
+    // NULL on the Wayland backend: everything needing X is skipped then
     dpy = GDK_DISPLAY ();
-    root = DefaultRootWindow (dpy);
+    root = dpy ? DefaultRootWindow (dpy) : None;
 
     get_display_size ();
 
@@ -658,18 +668,22 @@ int main (int argc, char **argv) {
 
     start_inmd_window ();
 
+    if (dpy) {
 #if USE_XIM
-    open_xim ();
+        open_xim ();
 #endif
 
-    gdk_window_add_filter (NULL, my_gdk_filter, NULL);
+        gdk_window_add_filter (NULL, my_gdk_filter, NULL);
 
-    init_atom_property ();
+        init_atom_property ();
+
+        // disable the io handler abort
+        // void *olderr =
+        XSetErrorHandler ((XErrorHandler) xerror_handler);
+    }
+
     signal (SIGINT, sig_do_exit);
     signal (SIGHUP, sig_do_exit);
-    // disable the io handler abort
-    // void *olderr =
-    XSetErrorHandler ((XErrorHandler) xerror_handler);
 
     init_hime_im_serv (xim_xwin);
 

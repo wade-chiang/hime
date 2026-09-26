@@ -260,9 +260,12 @@ static void setup_unix_domain_socket (void) {
                     cb_new_hime_client,
                     GINT_TO_POINTER (Connection_type_unix));
 
+    // on X11, also publish the daemon for clients finding it through X
     Display *display = GDK_DISPLAY ();
-    setup_xproperty (display, sock_path);
-    setup_xselection (display);
+    if (display && xim_xwin) {
+        setup_xproperty (display, sock_path);
+        setup_xselection (display);
+    }
 }
 
 static void get_ip_address (uint32_t *ip) {
@@ -375,6 +378,12 @@ void init_hime_im_serv (const Window window) {
 
     if (!hime_remote_client) {
         dbg ("connection via TCP is disabled\n");
+        return;
+    }
+
+    // remote clients find the address in a property of the X window
+    if (!xim_xwin) {
+        fprintf (stderr, "hime: remote clients need an X display, TCP is disabled\n");
         return;
     }
 
