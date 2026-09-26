@@ -262,6 +262,8 @@ int main (int argc, char **argv) {
         gtk_entry_set_visibility (GTK_ENTRY (entry), FALSE);
         gtk_entry_set_input_purpose (GTK_ENTRY (entry), GTK_INPUT_PURPOSE_PASSWORD);
     }
+    // the same place on any compositor (sway tiles it so anyway)
+    gtk_window_maximize (GTK_WINDOW (window));
     g_signal_connect (window, "notify::is-active", G_CALLBACK (on_active), NULL);
     g_timeout_add_seconds (30, timeout_cb, NULL);
 

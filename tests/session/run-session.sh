@@ -106,7 +106,7 @@ daemon_env=(HIME_TABLE_DIR="$top/data" HIME_TEST_HOOKS=1 HIME_MODULE_DIR="$top/s
 
 if [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]]; then
     # KWin starts the daemon (in the foreground) on a connection of its own
-    KWIN_COMPOSE=Q KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 \
+    KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 \
         KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 \
         KWIN_XKB_DEFAULT_KEYMAP=true XKB_DEFAULT_LAYOUT=us \
         kwin_wayland --virtual --width 1280 --height 800 --socket wl-hime-test \
