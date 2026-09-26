@@ -109,9 +109,15 @@ keeping HIME's own UI and typing feel. Phases:
    clients as notifications: unsolicited `HIME_NOTIFY_MAGIC` messages on
    UNIX connections of clients that asked for them (see
    `hime-protocol.h`, `hime_notify_send ()` in `src/im-dispatch.c`, the
-   modules' fd watches); XTest remains for XIM and old clients. Left: the
-   input method menu; virtual keyboard modifiers and keys the engine does
-   not take on Wayland. Modules get the
+   modules' fd watches). They go to the connection that last sent
+   focus-in or a key (fields of one X window share a ClientState, and a
+   new connection becomes current_CS while it is set up, so neither
+   current_CS nor its owner is right). XTest remains for XIM and old
+   clients, and for the virtual keyboard on X11 applications. Modules
+   must hand out notifications taken in while waiting for other replies
+   (`hime_im_client_notify_pending ()`), before the key's own text. Left:
+   the input method menu; virtual keyboard modifiers and keys the engine
+   does not take in Wayland applications. Modules get the
    window helpers through `HIME_module_main_functions` (modules must use
    it: the daemon exports no symbols). Session tests cover the intcode,
    chewing and anthy modules (`@method`). The intcode module logs two
