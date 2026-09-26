@@ -160,6 +160,7 @@ static const WlImProtocol protocol = {
     grab_keyboard,
     state,
     popup,
+    FALSE,
 };
 
 static void im_activate (void *data, struct zwp_input_method_v2 *m) {
@@ -219,7 +220,7 @@ gboolean wl_im_v2_global (struct wl_registry *registry, uint32_t name, const cha
     }
 
     struct wl_seat *seat = wl_im_seat ();
-    if (im_manager && vk_manager && !im && seat) {
+    if (im_manager && vk_manager && !im && seat && !wl_im_started ()) {
         im = zwp_input_method_manager_v2_get_input_method (im_manager, seat);
         zwp_input_method_v2_add_listener (im, &im_listener, NULL);
         vk = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard (vk_manager, seat);

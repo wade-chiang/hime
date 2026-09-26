@@ -47,12 +47,16 @@ typedef struct {
     void (*state) (gpointer token);
     // Give the popup role to SURFACE, the wl_surface of WIN, which is
     // being mapped; store the role object as the "hime-popup-surface" data
-    // of WIN, with its destructor
+    // of WIN, with its destructor (NULL: no popups; checked each time)
     void (*popup) (GtkWidget *win, struct wl_surface *surface);
+    // a state with another token needs a grab of its own (v1: a context)
+    gboolean regrab;
 } WlImProtocol;
 
-// The protocol is ready: the input method of the seat is PROTOCOL
+// The protocol is ready: the input method of the seat is PROTOCOL (the
+// first one a compositor offers)
 void wl_im_start (const WlImProtocol *protocol);
+gboolean wl_im_started (void);
 // another input method has the seat
 void wl_im_queue_unavailable (void);
 

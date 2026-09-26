@@ -42,6 +42,7 @@ static struct zwp_input_panel_v1 *panel;
 typedef struct {
     struct zwp_input_method_context_v1 *context;
     uint32_t serial;
+    gboolean password;
 } Context;
 
 // the context activated last, as the events come, and the one the core
@@ -152,28 +153,37 @@ static void popup (GtkWidget *win, struct wl_surface *surface) {
                             (GDestroyNotify) zwp_input_panel_surface_v1_destroy);
 }
 
-static const WlImProtocol protocol = {
+// popup is set once the compositor offers input panels
+static WlImProtocol protocol = {
     commit_text,
     forward_key,
     forward_modifiers,
     NULL,
     grab_keyboard,
     state,
-    popup,
+    NULL,
+    TRUE,
 };
 
 static void context_surrounding_text (void *data, struct zwp_input_method_context_v1 *context,
                                       const char *text, uint32_t cursor, uint32_t anchor) {
 }
 
+// KWin keeps the context when a text-input-v2 application moves the focus
+// to another field or resets it: as a new field
 static void context_reset (void *data, struct zwp_input_method_context_v1 *context) {
+    Context *c = data;
+    if (c == latest) {
+        wl_im_queue_state (TRUE, c->password, TRUE, c);
+    }
 }
 
 static void context_content_type (void *data, struct zwp_input_method_context_v1 *context,
                                   uint32_t hint, uint32_t purpose) {
     Context *c = data;
+    c->password = purpose == CONTENT_PURPOSE_PASSWORD;
     if (c == latest) {
-        wl_im_queue_state (TRUE, purpose == CONTENT_PURPOSE_PASSWORD, FALSE, c);
+        wl_im_queue_state (TRUE, c->password, FALSE, c);
     }
 }
 
@@ -226,12 +236,13 @@ static const struct zwp_input_method_v1_listener im_listener = {
 
 gboolean wl_im_v1_global (struct wl_registry *registry, uint32_t name, const char *interface,
                           uint32_t version) {
-    if (!strcmp (interface, zwp_input_method_v1_interface.name) && !im) {
+    if (!strcmp (interface, zwp_input_method_v1_interface.name) && !im && !wl_im_started ()) {
         im = wl_registry_bind (registry, name, &zwp_input_method_v1_interface, 1);
         zwp_input_method_v1_add_listener (im, &im_listener, NULL);
         wl_im_start (&protocol);
     } else if (!strcmp (interface, zwp_input_panel_v1_interface.name) && !panel) {
         panel = wl_registry_bind (registry, name, &zwp_input_panel_v1_interface, 1);
+        protocol.popup = popup;
     } else {
         return FALSE;
     }

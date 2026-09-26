@@ -65,8 +65,9 @@ static struct xkb_keymap *keymap;
 static struct xkb_state *xkb_state;
 
 // the state applied: a text field is focused, and takes a password (pass
-// all keys on)
+// all keys on); the protocol's token of that state
 static gboolean active, bypass;
+static gpointer applied_token;
 
 // the one ClientState of all text-input applications
 static ClientState wl_cs;
@@ -80,10 +81,12 @@ static int shown_cursor;
 static guint8 pressed[KEYS_N];
 static guint8 forwarded[KEYS_N];
 
-// repeat of a held key that HIME handles (the application repeats the
-// keys it gets), unless the compositor repeats keys itself (KWin)
-static int32_t repeat_rate = 25, repeat_delay = 600;
-static gboolean compositor_repeats;
+// Repeat of a held key that HIME handles (the application repeats the
+// keys it gets).  Each grab sends its own rate: 0 when the compositor
+// repeats keys itself (KWin, for applications that let it repeat theirs).
+#define REPEAT_RATE 25
+#define REPEAT_DELAY 600
+static int32_t repeat_rate = REPEAT_RATE, repeat_delay = REPEAT_DELAY;
 static guint repeat_source;
 static uint32_t repeat_key;
 
@@ -305,7 +308,7 @@ static gboolean repeat_cb (gpointer data) {
     if (handling) {
         return G_SOURCE_CONTINUE;
     }
-    if (!protocol || !active || bypass) {
+    if (!protocol || !active || bypass || repeat_rate <= 0) {
         repeat_source = 0;
         return G_SOURCE_REMOVE;
     }
@@ -351,18 +354,16 @@ static void key_press (uint32_t time, uint32_t key) {
         return;
     }
 
-    if (!compositor_repeats && repeat_rate > 0 && xkb_keymap_key_repeats (keymap, key + 8)) {
+    if (repeat_rate > 0 && xkb_keymap_key_repeats (keymap, key + 8)) {
         repeat_key = key;
         repeat_source = g_timeout_add (repeat_delay, repeat_cb, GINT_TO_POINTER (TRUE));
     }
 }
 
-// The compositor repeats a held key (KWin): as our own repeat
+// The compositor repeats a held key (KWin): as our own repeat, which it
+// replaces (older KWin sends no rate)
 static void key_repeated (uint32_t time, uint32_t key) {
-    if (!compositor_repeats) {
-        compositor_repeats = TRUE;
-        stop_repeat ();
-    }
+    stop_repeat ();
     if (key < KEYS_N && forwarded[key]) {
         forward_key (time, key, KEY_STATE_REPEATED);
         return;
@@ -405,6 +406,9 @@ static void key_release (uint32_t time, uint32_t key) {
 // a HIME module: grab only while a text-input field is focused.
 static void start_grab (void) {
     memset (pressed, 0, sizeof (pressed));
+    // until the grab sends its own
+    repeat_rate = REPEAT_RATE;
+    repeat_delay = REPEAT_DELAY;
     protocol->grab (TRUE);
 }
 
@@ -483,18 +487,23 @@ static void apply_state (gboolean new_active, gboolean password, gboolean activa
     if (new_active != was_active || password != was_bypass || activated) {
         stop_repeat ();
     }
-    // with the state it was taken for
-    if (was_active && (!new_active || activated)) {
+    // A grab belongs to the state it was taken for (v1: to a field's
+    // context), released with it
+    const gboolean new_state = protocol->regrab && token != applied_token;
+    if (was_active && (!new_active || new_state)) {
         stop_grab ();
     }
     active = new_active;
     bypass = password;
+    applied_token = token;
     if (protocol->state) {
         protocol->state (token);
     }
 
-    if (active && (!was_active || activated)) {
+    if (active && (!was_active || new_state)) {
         start_grab ();
+    }
+    if (active && (!was_active || activated)) {
         focus_in ();
     } else if (!active && was_active) {
         focus_out ();
@@ -557,6 +566,10 @@ static void handle_events (void) {
         g_free (event);
     }
     handling = FALSE;
+}
+
+gboolean wl_im_started (void) {
+    return protocol != NULL;
 }
 
 void wl_im_start (const WlImProtocol *new_protocol) {
