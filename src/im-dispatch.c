@@ -118,7 +118,11 @@ static void shutdown_client (const int fd) {
     g_source_remove (hime_clients[idx].tag);
 
     if (hime_clients[idx].cs == current_CS) {
-        hide_in_win (current_CS);
+        // not the window of another client that has the focus (a tool's
+        // connection, e.g. hime-setup's, is current while it is set up)
+        if (current_CS == hime_focused_client ()) {
+            hide_in_win (current_CS);
+        }
         current_CS = NULL;
     }
 
