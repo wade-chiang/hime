@@ -9,9 +9,9 @@ pkgdesc="HIME input method with native Wayland support (GTK 3/4, Qt 5/6)"
 arch=('x86_64')
 url="https://github.com/wade-chiang/hime"
 license=('LGPL2' 'FDL' 'GPL2')
-depends=('gtk3' 'gtk4' 'libxtst' 'qt5-base' 'qt6-base')
+depends=('gtk3' 'gtk4' 'gtk-layer-shell' 'libxtst' 'qt5-base' 'qt6-base')
 makedepends=('git' 'gettext')
-optdepends=('xwayland-satellite: run hime on niri and other compositors without Xwayland')
+optdepends=('xwayland-satellite: X11 applications on niri')
 conflicts=('hime' 'hime-git')
 provides=('hime')
 source=("${_pkgname}::git+https://github.com/wade-chiang/hime.git#branch=master")
