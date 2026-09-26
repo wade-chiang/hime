@@ -82,9 +82,14 @@ uninstall:
 .PHONY: clean
 clean:
 	@echo "clean up"
-	@rm -f $(OBJS) im-hime.so *~ core.* *moc*.cpp *.E .depend $(QT_IM_TEST)
+	@rm -f $(OBJS) *.d im-hime.so *~ core.* *moc*.cpp *.E .depend $(QT_IM_TEST)
 	@rm -f moc_hime-qt.cpp moc_hime-imcontext-qt.cpp
 
 .depend:
 	@echo "building $@ ..."
 	@$(CXX) $(CXXFLAGS) -MM *.cpp > $@
+
+# Rebuild objects when a header they include changes: the compiler writes
+# the dependencies of each object into a .d file next to it.
+CXXFLAGS += -MMD -MP
+-include $(wildcard *.d)

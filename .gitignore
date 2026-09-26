@@ -71,3 +71,8 @@ tests/gtab/local/
 tests/session/hime-client-test
 tests/session/gtk*-im-test
 tests/session/qt*-im-test
+# makepkg output
+distro/archlinux/pkg/
+distro/archlinux/src/
+distro/archlinux/hime/
+distro/archlinux/*.pkg.tar.*

@@ -66,39 +66,39 @@ uninstall:
 
 # rules to rebuild $(DEPS), rebuild with -fPIC
 hime-common.o: ../hime-common.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 hime-conf.o: ../hime-conf.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 hime-crypt.o: ../hime-crypt.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 hime-settings.o: ../hime-settings.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 locale.o: ../locale.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 im-addr.o: ../im-addr.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 pho2pinyin.o: ../pho2pinyin.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 pinyin.o: ../pinyin.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 util.o: ../util.c
-	@echo "  $^ -> $@"
+	@echo "  $< -> $@"
 	$(CCX) -c $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 
