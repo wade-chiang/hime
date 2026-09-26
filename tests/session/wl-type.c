@@ -22,7 +22,7 @@
  *
  * Usage: wl-type KEY...
  *   KEY is a single character of the "us" layout or one of <space>
- *   <enter> <bs> <esc> <shift> (Shift pressed and released alone),
+ *   <enter> <bs> <tab> <esc> <shift> (Shift pressed and released alone),
  *   optionally prefixed by S- (Shift) and/or C- (Control).  @hold KEY
  *   holds KEY down for a second (key repeat).
  */
@@ -45,6 +45,7 @@
 // evdev key codes
 #define KEY_ESC 1
 #define KEY_BACKSPACE 14
+#define KEY_TAB 15
 #define KEY_ENTER 28
 #define KEY_LEFTCTRL 29
 #define KEY_LEFTSHIFT 42
@@ -124,6 +125,7 @@ static int parse_key (const char *tok, uint32_t *code, int *shift, int *ctrl) {
         {"<space>", KEY_SPACE},
         {"<enter>", KEY_ENTER},
         {"<bs>", KEY_BACKSPACE},
+        {"<tab>", KEY_TAB},
         {"<esc>", KEY_ESC},
         {"<shift>", KEY_LEFTSHIFT},
     };

@@ -22,8 +22,10 @@
  * wl-type: HIME gets them as the seat's input method.  Built against GTK 3
  * and GTK 4.
  *
- * Usage: gtk{3,4}-text-input-test [--password] [--im MODULE] TOKEN...
+ * Usage: gtk{3,4}-text-input-test [--password] [--im MODULE] [--two] TOKEN...
  *   --im MODULE   use that GTK IM module instead, e.g. hime
+ *   --two         a second entry after the first (<tab> moves there); its
+ *                 text is printed too
  *   TOKEN is a key for wl-type (see wl-type.c), or:
  *   @check        print the entry's text and preedit
  *   @hold KEY     hold KEY down for a second
@@ -46,7 +48,7 @@
 static char **tokens;
 static int tokensN, next_token;
 static char *dir;
-static GtkWidget *entry;
+static GtkWidget *entry, *entry2;
 static char *preedit;
 static gboolean started;
 
@@ -56,8 +58,11 @@ static void on_preedit_changed (GtkWidget *widget, const char *text, gpointer da
 }
 
 static void print_state (void) {
-    printf ("text=\"%s\" preedit=\"%s\"\n",
-            gtk_editable_get_text (GTK_EDITABLE (entry)), preedit ? preedit : "");
+    printf ("text=\"%s\" ", gtk_editable_get_text (GTK_EDITABLE (entry)));
+    if (entry2) {
+        printf ("text2=\"%s\" ", gtk_editable_get_text (GTK_EDITABLE (entry2)));
+    }
+    printf ("preedit=\"%s\"\n", preedit ? preedit : "");
     fflush (stdout);
 }
 
@@ -157,11 +162,16 @@ static void quit (void) {
 #endif
 
 int main (int argc, char **argv) {
-    gboolean password = FALSE;
+    dir = g_path_get_dirname (argv[0]);
+    gboolean password = FALSE, two = FALSE;
     const char *module = "wayland";
     for (;;) {
         if (argc > 1 && !strcmp (argv[1], "--password")) {
             password = TRUE;
+            argc--;
+            argv++;
+        } else if (argc > 1 && !strcmp (argv[1], "--two")) {
+            two = TRUE;
             argc--;
             argv++;
         } else if (argc > 2 && !strcmp (argv[1], "--im")) {
@@ -180,23 +190,41 @@ int main (int argc, char **argv) {
     }
     tokens = argv + 1;
     tokensN = argc - 1;
-    dir = g_path_get_dirname (argv[0]);
 
 #if GTK_CHECK_VERSION(4, 0, 0)
     gtk_init ();
     loop = g_main_loop_new (NULL, FALSE);
     GtkWidget *window = gtk_window_new ();
     entry = gtk_entry_new ();
-    gtk_window_set_child (GTK_WINDOW (window), entry);
-    g_signal_connect (gtk_editable_get_delegate (GTK_EDITABLE (entry)), "preedit-changed",
-                      G_CALLBACK (on_preedit_changed), NULL);
+    GtkWidget *box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+    gtk_box_append (GTK_BOX (box), entry);
+    if (two) {
+        entry2 = gtk_entry_new ();
+        gtk_box_append (GTK_BOX (box), entry2);
+    }
+    gtk_window_set_child (GTK_WINDOW (window), box);
 #else
     gtk_init (&argc, &argv);
     GtkWidget *window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     entry = gtk_entry_new ();
-    gtk_container_add (GTK_CONTAINER (window), entry);
-    g_signal_connect (entry, "preedit-changed", G_CALLBACK (on_preedit_changed), NULL);
+    GtkWidget *box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+    gtk_container_add (GTK_CONTAINER (box), entry);
+    if (two) {
+        entry2 = gtk_entry_new ();
+        gtk_container_add (GTK_CONTAINER (box), entry2);
+    }
+    gtk_container_add (GTK_CONTAINER (window), box);
 #endif
+    // the preedit of either entry
+    GtkWidget *entries[] = {entry, entry2};
+    for (int i = 0; i < 2 && entries[i]; i++) {
+#if GTK_CHECK_VERSION(4, 0, 0)
+        g_signal_connect (gtk_editable_get_delegate (GTK_EDITABLE (entries[i])), "preedit-changed",
+                          G_CALLBACK (on_preedit_changed), NULL);
+#else
+        g_signal_connect (entries[i], "preedit-changed", G_CALLBACK (on_preedit_changed), NULL);
+#endif
+    }
     if (password) {
         gtk_entry_set_visibility (GTK_ENTRY (entry), FALSE);
         gtk_entry_set_input_purpose (GTK_ENTRY (entry), GTK_INPUT_PURPOSE_PASSWORD);
