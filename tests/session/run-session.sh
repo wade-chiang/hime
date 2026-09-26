@@ -12,8 +12,8 @@
 # XMODIFIERS names IBus.  Requires mutter and dbus-run-session.
 #
 # The daemon's config can be adjusted with HIME_CONF="name=value ...", and
-# HIME_SESSION_METHOD=intcode makes the intcode module (from the build tree)
-# the default input method.
+# HIME_SESSION_METHOD=intcode, chewing or anthy makes that module (from the
+# build tree) the default input method.
 #
 # With HIME_SESSION_DAEMON_BACKEND=wayland the daemon is forced onto GDK's Wayland
 # backend with no X display at all.
@@ -53,9 +53,19 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     (cd "$conf" && "$top/src/hime-cin2gtab" test-liu.cin >/dev/null)
     printf 'test 1 test-liu.gtab -\n' >"$conf/gtab.list"
     printf '1 test-liu.gtab' >"$conf/config/default-input-method"
-    if [[ "${HIME_SESSION_METHOD:-}" == intcode ]]; then
-        printf 'int 0 intcode-module.so -\n' >>"$conf/gtab.list"
-        printf '0 intcode-module.so' >"$conf/config/default-input-method"
+    case "${HIME_SESSION_METHOD:-}" in
+    intcode) module="0 intcode-module.so" ;;
+    chewing) module="[ chewing-module.so" ;;
+    anthy) module="= anthy-module.so" ;;
+    *) module="" ;;
+    esac
+    if [[ -n "$module" && ! -f "$top/src/modules/${module#* }" ]]; then
+        echo "run-session.sh: ${module#* } not built" >&2
+        exit 77
+    fi
+    if [[ -n "$module" ]]; then
+        printf '%s %s -\n' "${HIME_SESSION_METHOD}" "$module" >>"$conf/gtab.list"
+        printf '%s' "$module" >"$conf/config/default-input-method"
     fi
     printf '1' >"$conf/config/hime-init-im-enabled"
     for kv in ${HIME_CONF:-}; do

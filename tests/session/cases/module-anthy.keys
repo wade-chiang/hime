@@ -1,0 +1,3 @@
+@method anthy
+# The anthy module: romaji k a is か, Enter commits it.
+k a <enter>

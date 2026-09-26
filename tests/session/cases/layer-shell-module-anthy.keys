@@ -1,0 +1,12 @@
+@compositor sway
+@method anthy
+@program layer-check.sh
+@conf hime-input-style=2
+@conf hime-root-x=100
+@conf hime-root-y=200
+@conf hime-pop-up-win=0
+@env HIME_CHECK_BACKGROUND=1000,700
+@env HIME_CHECK_POINTS=105,205 99,205 105,199
+# Windows of input method modules (here anthy) are layer surfaces too:
+# at the fixed position, and not windows that could take the focus.
+k a

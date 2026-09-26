@@ -17,7 +17,8 @@
 #                   instead of mutter
 #   @conf NAME=VALUE write a hime config value
 #   @outputs N      number of outputs of the sway session
-#   @method intcode make the intcode module the default input method
+#   @method NAME    make a module (intcode, chewing, anthy) the default
+#                   input method
 #
 # Usage: run-tests.sh [--update] [CASE.keys...]
 # Exits 77 (skipped) when mutter is not available; a case whose compositor
