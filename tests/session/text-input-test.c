@@ -32,12 +32,18 @@
  *   @hook ACTION  make the daemon do what a mouse action does (see
  *                 hime_test_hook in src/eve.c): commit TEXT, preedit or
  *                 key K
- *   The text and preedit are printed once more at the end.
+ *   @exec PROGRAM[:ARG...]
+ *                 run tests/session/PROGRAM with the ARGs (e.g. to take a
+ *                 screenshot while the field is focused and HIME's window
+ *                 shown); its exit status 77 (skipped) ends the test with it
+ *   The text and preedit are printed once more at the end.  The window's
+ *   background is blue, which HIME's windows are not.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 
 #include <gtk/gtk.h>
 
@@ -76,6 +82,9 @@ static gboolean continue_cb (gpointer data) {
 
 static void child_exited (GPid pid, gint status, gpointer data) {
     g_spawn_close_pid (pid);
+    if (WIFEXITED (status) && WEXITSTATUS (status) == 77) {
+        exit (77);
+    }
     // let the input method's commits arrive
     g_timeout_add (300, continue_cb, NULL);
 }
@@ -108,7 +117,15 @@ static void run_tokens (void) {
     }
 
     GPtrArray *argv = g_ptr_array_new_with_free_func (g_free);
-    if (!strcmp (tokens[next_token], "@hook") && next_token + 1 < tokensN) {
+    if (!strcmp (tokens[next_token], "@exec") && next_token + 1 < tokensN) {
+        char **words = g_strsplit (tokens[next_token + 1], ":", -1);
+        g_ptr_array_add (argv, g_build_filename (dir, words[0], NULL));
+        for (int i = 1; words[i]; i++) {
+            g_ptr_array_add (argv, g_strdup (words[i]));
+        }
+        g_strfreev (words);
+        next_token += 2;
+    } else if (!strcmp (tokens[next_token], "@hook") && next_token + 1 < tokensN) {
         const char *action = tokens[next_token + 1];
         const gboolean has_arg = (!strcmp (action, "commit") || !strcmp (action, "key")) &&
                                  next_token + 2 < tokensN;
@@ -120,7 +137,7 @@ static void run_tokens (void) {
     } else {
         g_ptr_array_add (argv, g_build_filename (dir, "wl-type", NULL));
         while (next_token < tokensN && strcmp (tokens[next_token], "@check") &&
-               strcmp (tokens[next_token], "@hook")) {
+               strcmp (tokens[next_token], "@hook") && strcmp (tokens[next_token], "@exec")) {
             g_ptr_array_add (argv, g_strdup (tokens[next_token++]));
         }
     }
@@ -225,6 +242,22 @@ int main (int argc, char **argv) {
         g_signal_connect (entries[i], "preedit-changed", G_CALLBACK (on_preedit_changed), NULL);
 #endif
     }
+    GtkCssProvider *css = gtk_css_provider_new ();
+    const char *style = "window { background: #0000ff; }";
+#if GTK_CHECK_VERSION(4, 12, 0)
+    gtk_css_provider_load_from_string (css, style);
+#elif GTK_CHECK_VERSION(4, 0, 0)
+    gtk_css_provider_load_from_data (css, style, -1);
+#else
+    gtk_css_provider_load_from_data (css, style, -1, NULL);
+#endif
+#if GTK_CHECK_VERSION(4, 0, 0)
+    gtk_style_context_add_provider_for_display (gdk_display_get_default (), GTK_STYLE_PROVIDER (css),
+                                                GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+#else
+    gtk_style_context_add_provider_for_screen (gdk_screen_get_default (), GTK_STYLE_PROVIDER (css),
+                                               GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+#endif
     if (password) {
         gtk_entry_set_visibility (GTK_ENTRY (entry), FALSE);
         gtk_entry_set_input_purpose (GTK_ENTRY (entry), GTK_INPUT_PURPOSE_PASSWORD);

@@ -1,0 +1,12 @@
+@program gtk3-text-input-test
+@compositor sway
+@conf hime-input-style=1
+@conf hime-root-x=600
+@conf hime-root-y=500
+@conf hime-pop-up-win=0
+@env HIME_CHECK_BACKGROUND=1000,700
+# Switching the input style (as hime-setup does) while typing: the window
+# moves to the fixed position and back under the cursor.
+b @exec popup-shot.sh:60,70:610,510 @exec set-style.sh:2
+c @exec popup-shot.sh:610,510:60,70 @exec set-style.sh:1
+<space> b @exec popup-shot.sh:60,70:610,510
