@@ -160,17 +160,10 @@ void module_setup_window_create (GtkButton *button, gpointer data_hime_setup_win
     else
         gtk_box_pack_start (GTK_BOX (hbox_cancel_ok), button_cancel, TRUE, TRUE, 0);
     button_ok = gtk_button_new_from_stock (GTK_STOCK_OK);
-#if !GTK_CHECK_VERSION(2, 91, 2)
     if (button_order)
         gtk_box_pack_end (GTK_BOX (hbox_cancel_ok), button_ok, TRUE, TRUE, 5);
     else
         gtk_box_pack_start (GTK_BOX (hbox_cancel_ok), button_ok, TRUE, TRUE, 5);
-#else
-    if (button_order)
-        gtk_grid_attach_next_to (GTK_BOX (hbox_cancel_ok), button_ok, button_cancel, GTK_POS_LEFT, 1, 1);
-    else
-        gtk_grid_attach_next_to (GTK_BOX (hbox_cancel_ok), button_ok, button_cancel, GTK_POS_RIGHT, 1, 1);
-#endif
 
     g_signal_connect (G_OBJECT (button_cancel), "clicked",
                       G_CALLBACK (cb_close_window),
