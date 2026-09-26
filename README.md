@@ -8,10 +8,23 @@
 
 ### 目前狀態
 
-- 原生 Wayland 的 GTK 3、GTK 4、Qt 5、Qt 6 程式可以透過 HIME 的 IM module 輸入，不需要 `GDK_BACKEND=x11`。
+- GTK 與 Qt 的 IM module 不再依賴 X11，原生 Wayland 程式可以透過 HIME 輸入，不需要 `GDK_BACKEND=x11`。
 - 新增 GTK 4 IM module。
 - HIME 主程式與它的視窗目前仍跑在 Xwayland 上。
-- 已在 GNOME 50 與 niri 26.04 上實際使用，並以固定位置的輸入視窗（外觀設定 → 固定輸入視窗位置）為主。
+- 以固定位置的輸入視窗（外觀設定 → 固定輸入視窗位置）為主。
+
+驗證範圍：
+
+- 自動測試：`make check-session`，在 headless mutter 中以模擬按鍵輸入。
+- 真實桌面測試程式：同樣的測試程式，在實際登入的桌面中，以已安裝的套件與嘸蝦米字根表輸入。
+- 實際使用：在真實程式中手動打字。
+
+| 程式 | 自動測試 | 真實桌面測試程式 | 實際使用 |
+|---|---|---|---|
+| GTK 3 | Wayland、X11 | niri 26.04（Wayland） | 尚未 |
+| GTK 4 | Wayland、X11 | GNOME 50（Wayland） | Ghostty（GNOME 50、niri 26.04） |
+| Qt 6 | Wayland、X11 | niri 26.04（Wayland） | DMS 記事本（Quickshell，niri 26.04）；GNOME 尚未 |
+| Qt 5 | 僅 X11 | niri 26.04（經 xwayland-satellite 的 X11） | 尚未；Wayland 未測試 |
 
 ### 安裝
 
