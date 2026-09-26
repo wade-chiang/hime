@@ -34,8 +34,9 @@ HIME 作為 Wayland 輸入法（text-input 程式，不經 HIME module）：
 | 程式 | 自動測試 | 實際使用 |
 |---|---|---|
 | GTK 3（`GTK_IM_MODULE=wayland`） | sway | 尚未 |
-| GTK 4 | sway | 尚未 |
-| Qt 6（`QT_IM_MODULE=wayland`） | sway | 尚未 |
+| GTK 4 | sway | Ghostty（niri 26.04） |
+| Qt 6（`QT_IM_MODULE=wayland`） | sway | FeatherPad（niri 26.04） |
+| 其他 text-input 程式 | — | foot（niri 26.04） |
 
 ### 安裝
 
