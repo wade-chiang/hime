@@ -140,6 +140,18 @@ static void state (gpointer token) {
     current = c;
 }
 
+// An overlay panel, which KWin shows below the text cursor (only one at a
+// time: the main input window)
+static void popup (GtkWidget *win, struct wl_surface *surface) {
+    if (!panel) {
+        return;
+    }
+    struct zwp_input_panel_surface_v1 *role = zwp_input_panel_v1_get_input_panel_surface (panel, surface);
+    zwp_input_panel_surface_v1_set_overlay_panel (role);
+    g_object_set_data_full (G_OBJECT (win), "hime-popup-surface", role,
+                            (GDestroyNotify) zwp_input_panel_surface_v1_destroy);
+}
+
 static const WlImProtocol protocol = {
     commit_text,
     forward_key,
@@ -147,7 +159,7 @@ static const WlImProtocol protocol = {
     NULL,
     grab_keyboard,
     state,
-    NULL,
+    popup,
 };
 
 static void context_surrounding_text (void *data, struct zwp_input_method_context_v1 *context,
