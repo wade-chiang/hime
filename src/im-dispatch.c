@@ -269,7 +269,13 @@ static void do_get_preedit (const int fd, ClientState *cs) {
     int cursor = 0;
     int sub_comp_len = 0;
 
+    // with the state of the client asking (its preedit setting), not of the
+    // connection that happens to be current_CS (e.g. a tool's that asked
+    // for a mouse action)
+    ClientState *const current = current_CS;
+    current_CS = cs;
     int attrN = hime_get_preedit (cs, str, attr, &cursor, &sub_comp_len);
+    current_CS = current;
 
     if (hime_edit_display & (HIME_EDIT_DISPLAY_BOTH | HIME_EDIT_DISPLAY_OVER_THE_SPOT)) {
         cursor = 0;
