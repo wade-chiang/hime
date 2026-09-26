@@ -1,0 +1,13 @@
+@compositor sway
+@outputs 2
+@program layer-check.sh
+@conf hime-input-style=2
+@conf hime-root-x=1400
+@conf hime-root-y=200
+@conf hime-pop-up-win=0
+@env HIME_CHECK_BACKGROUND=600,700
+@env HIME_CHECK_POINTS=1275,205 1285,205 1500,205 100,205
+# Two outputs side by side: layer surfaces are placed on one output, so
+# the fixed position is kept within that output (x=1400 is past its right
+# edge and ends up against it) instead of off-screen.
+b

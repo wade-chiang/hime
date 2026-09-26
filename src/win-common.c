@@ -28,7 +28,9 @@
 // On the Wayland backend (no X display) with a compositor supporting
 // wlr-layer-shell, the daemon's windows are layer surfaces: they never take
 // the keyboard focus and are placed by anchoring them to the top-left corner
-// of the output with margins, as windows cannot position themselves there.
+// of one output with margins, as windows cannot position themselves there.
+// That is the output at the origin of the layout, Wayland having no primary
+// one (get_primary_monitor ()).
 gboolean hime_use_layer_shell (void) {
 #if HIME_LAYER_SHELL
     static int use = -1;
@@ -57,6 +59,9 @@ void hime_window_init (GtkWidget *win, gboolean positioned) {
     gtk_layer_set_keyboard_mode (window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
     // margins count from the output edges, not from other surfaces' zones
     gtk_layer_set_exclusive_zone (window, -1);
+    // all on one output, whose size get_display_size () uses: positions
+    // are relative to it
+    gtk_layer_set_monitor (window, get_primary_monitor ());
 
     if (positioned) {
         gtk_layer_set_anchor (window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);

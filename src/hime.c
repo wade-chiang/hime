@@ -560,8 +560,26 @@ static void get_display_size () {
     display_width = gdk_screen_width ();
     display_height = gdk_screen_height ();
 #else
+    GdkMonitor *monitor = get_primary_monitor ();
+    if (!monitor) {
+        // no output (yet): keep windows within a common screen size
+        display_width = 1920;
+        display_height = 1080;
+        return;
+    }
+
+    // Layer surfaces are placed on that one output (hime_window_init),
+    // with margins from its edges.
+    if (hime_use_layer_shell ()) {
+        GdkRectangle geometry;
+        gdk_monitor_get_geometry (monitor, &geometry);
+        display_width = geometry.width;
+        display_height = geometry.height;
+        return;
+    }
+
     GdkRectangle work_area;
-    gdk_monitor_get_workarea (get_primary_monitor (), &work_area);
+    gdk_monitor_get_workarea (monitor, &work_area);
 
     // TODO:
     // The workaround only fixes the wrong input window position bug when using multiple monitors with the same resolution.

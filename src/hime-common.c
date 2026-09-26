@@ -177,9 +177,10 @@ GdkMonitor *get_primary_monitor (void) {
     GdkDisplay *display = get_default_display ();
     GdkMonitor *primary_monitor = gdk_display_get_primary_monitor (display);
     if (!primary_monitor) {
-        // Wayland has no primary monitor
+        // Wayland has no primary monitor: take the one at the origin of the
+        // layout, where X11 positions start from
         dbg ("gdk_display_get_primary_monitor returned NULL\n");
-        primary_monitor = gdk_display_get_monitor (display, 0);
+        primary_monitor = gdk_display_get_monitor_at_point (display, 0, 0);
     }
     return primary_monitor;
 }

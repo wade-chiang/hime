@@ -18,7 +18,8 @@
 #
 # With HIME_SESSION_COMPOSITOR=sway the session is a headless sway instead:
 # it supports layer-shell, has no Xwayland, and the daemon runs on the
-# Wayland backend.  Screenshots can be taken with grim.
+# Wayland backend.  Screenshots can be taken with grim.  With
+# HIME_SESSION_OUTPUTS=2 it has two 1280x800 outputs side by side.
 #
 # GTK and Qt applications pick up the HIME IM modules from the build tree.
 # With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
@@ -68,11 +69,13 @@ tmp="$HIME_SESSION_TMP"
 log="$tmp/compositor.log"
 
 if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
-    printf '%s\n' 'output HEADLESS-1 resolution 1280x800' \
+    printf '%s\n' 'output HEADLESS-1 resolution 1280x800 position 0 0' \
+        'output HEADLESS-2 resolution 1280x800 position 1280 0' \
         'xwayland disable' >"$tmp/sway.config"
     # sway names its socket itself (wayland-N, the only one in our
     # private XDG_RUNTIME_DIR); there is no swaybg for the background
-    WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
+    WLR_HEADLESS_OUTPUTS="${HIME_SESSION_OUTPUTS:-1}" \
+        WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
         WLR_RENDERER=pixman sway -c "$tmp/sway.config" >"$log" 2>&1 &
 else
     mutter --headless --wayland --wayland-display=wl-hime-test \
