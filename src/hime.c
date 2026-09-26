@@ -19,6 +19,8 @@
 
 #include <signal.h>
 
+#include <glib-unix.h>
+
 #include "hime.h"
 
 #include "im-srv.h"
@@ -533,6 +535,11 @@ void sig_do_exit (int sig) {
     do_exit ();
 }
 
+static gboolean sigterm_cb (gpointer data) {
+    do_exit ();
+    return G_SOURCE_REMOVE;
+}
+
 void load_phrase ();
 void init_tray (), exec_setup_scripts ();
 void init_tray_double ();
@@ -837,6 +844,10 @@ int main (int argc, char **argv) {
 
     signal (SIGINT, sig_do_exit);
     signal (SIGHUP, sig_do_exit);
+    // A daemon started by the compositor replaces this one with SIGTERM
+    // (im-srv.c): exit normally, so that a compositor that started this one
+    // does not take it for a crash and start it again
+    g_unix_signal_add (SIGTERM, sigterm_cb, NULL);
 
     init_hime_im_serv (xim_xwin);
     wl_im_init ();

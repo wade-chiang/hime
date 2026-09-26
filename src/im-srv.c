@@ -20,8 +20,11 @@
 // struct ucred
 #define _GNU_SOURCE
 
+#include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <string.h>
+#include <sys/pidfd.h>
 #include <unistd.h>
 
 #include <arpa/inet.h>
@@ -82,11 +85,11 @@ static int accept_sockfd (const Connection_type type) {
     if (type == Connection_type_unix) {
         // passing NULL to accept(3) means that we don't care the address info
         // of the connecting socket
-        return accept (im_sockfd, NULL, NULL);
+        return accept4 (im_sockfd, NULL, NULL, SOCK_CLOEXEC);
     }
 
     // otherwise, type == Connection_type_tcp
-    return accept (im_tcp_sockfd, NULL, NULL);
+    return accept4 (im_tcp_sockfd, NULL, NULL, SOCK_CLOEXEC);
 }
 
 static gboolean cb_new_hime_client (GIOChannel *source,
@@ -142,56 +145,97 @@ static void init_unix_socket (struct sockaddr_un *serv_addr,
     dbg ("-- %s\n", serv_addr->sun_path);
 }
 
+// Connect to the socket at ADDR without waiting (a listener that does not
+// accept, e.g. one inherited by a child of a dead daemon, would block a
+// blocking connect once its queue is full); -1 if nothing listens.  With
+// PEER, also get the process that listens, unless its queue is full.
+static int connect_now (const struct sockaddr_un *addr, struct ucred *peer) {
+    const int sockfd = socket (AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    if (sockfd < 0) {
+        return -1;
+    }
+    if (connect (sockfd, (const struct sockaddr *) addr, SUN_LEN (addr)) == 0) {
+        socklen_t len = sizeof (*peer);
+        if (peer && getsockopt (sockfd, SOL_SOCKET, SO_PEERCRED, peer, &len) < 0) {
+            peer->pid = 0;
+        }
+        return sockfd;
+    }
+    // EAGAIN: the queue is full, but something listens
+    if (errno == EAGAIN) {
+        if (peer) {
+            peer->pid = 0;
+        }
+        return sockfd;
+    }
+    close (sockfd);
+    return -1;
+}
+
 static gboolean is_sock_path_in_use (const struct sockaddr_un *serv_addr) {
     // another hime is running if something accepts connections on the path
-
-    const int sockfd = socket (AF_UNIX, SOCK_STREAM, 0);
+    const int sockfd = connect_now (serv_addr, NULL);
     if (sockfd < 0) {
         return FALSE;
     }
-
-    const gboolean in_use = connect (sockfd, (const struct sockaddr *) serv_addr, SUN_LEN (serv_addr)) == 0;
     close (sockfd);
-    return in_use;
+    return TRUE;
+}
+
+// Is PID a hime daemon (not another program listening there)?
+static gboolean is_hime (pid_t pid) {
+    char path[64], comm[32] = "";
+    snprintf (path, sizeof (path), "/proc/%d/comm", (int) pid);
+    FILE *f = fopen (path, "r");
+    if (!f) {
+        return FALSE;
+    }
+    const gboolean read = fgets (comm, sizeof (comm), f) != NULL;
+    fclose (f);
+    return read && !strcmp (comm, "hime\n");
+}
+
+// wait for the process of PIDFD to exit, for at most MS
+static gboolean wait_exit (int pidfd, int ms) {
+    struct pollfd fd = {pidfd, POLLIN, 0};
+    return poll (&fd, 1, ms) > 0;
 }
 
 // Started by the compositor as its input method, the daemon replaces one
-// that is already running (e.g. started by an IM module), which cannot get
-// the compositor's input method connection: ask the daemon listening on
-// ADDR to exit, and wait until it has.  Clients connect again by themselves.
+// that is already running on its socket (e.g. started by an IM module),
+// which cannot get the compositor's input method connection: ask the
+// daemon listening on ADDR to exit (it exits normally on SIGTERM), and wait
+// until it has.  Clients connect again by themselves.
 static void replace_running_daemon (const struct sockaddr_un *addr) {
-    const int sockfd = socket (AF_UNIX, SOCK_STREAM, 0);
+    struct ucred cred = {0};
+    const int sockfd = connect_now (addr, &cred);
     if (sockfd < 0) {
         return;
     }
-    // the process that listens on it
-    struct ucred cred = {0};
-    socklen_t len = sizeof (cred);
-    const gboolean found =
-        connect (sockfd, (const struct sockaddr *) addr, SUN_LEN (addr)) == 0 &&
-        getsockopt (sockfd, SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0;
+    // the pidfd, taken while the connection holds the listener: the pid
+    // cannot belong to another process then
+    const int pidfd = cred.pid > 0 && cred.pid != getpid () && cred.uid == getuid () &&
+                              is_hime (cred.pid)
+                          ? pidfd_open (cred.pid, 0)
+                          : -1;
     close (sockfd);
-    if (!found || cred.pid <= 0 || cred.pid == getpid () || cred.uid != getuid ()) {
+    if (pidfd < 0) {
         return;
     }
 
     fprintf (stderr, "hime: replacing the hime already running (pid %d)\n", (int) cred.pid);
-    kill (cred.pid, SIGTERM);
-    for (int i = 0; i < 50; i++) {
-        if (!is_sock_path_in_use (addr)) {
-            return;
-        }
-        usleep (100000);
+    pidfd_send_signal (pidfd, SIGTERM, NULL, 0);
+    if (!wait_exit (pidfd, 5000)) {
+        pidfd_send_signal (pidfd, SIGKILL, NULL, 0);
+        wait_exit (pidfd, 2000);
     }
-    kill (cred.pid, SIGKILL);
-    for (int i = 0; i < 20 && is_sock_path_in_use (addr); i++) {
-        usleep (100000);
-    }
+    close (pidfd);
 }
 
 // Point the session's default socket, used by clients without DISPLAY, at
-// ours unless another live daemon already owns it.
-static void link_default_sock_path (const char *sock_path) {
+// ours unless another live daemon already owns it (or FORCE: ours is the
+// compositor's input method, which clients without DISPLAY need).
+static void link_default_sock_path (const char *sock_path, gboolean force) {
     char default_path[UNIX_PATH_MAX];
     get_hime_im_srv_default_sock_path (default_path, sizeof (default_path));
     if (!default_path[0] || !strcmp (default_path, sock_path)) {
@@ -200,7 +244,7 @@ static void link_default_sock_path (const char *sock_path) {
 
     struct sockaddr_un default_addr;
     init_unix_socket (&default_addr, default_path);
-    if (is_sock_path_in_use (&default_addr)) {
+    if (!force && is_sock_path_in_use (&default_addr)) {
         return;
     }
 
@@ -267,26 +311,20 @@ static void setup_unix_domain_socket (void) {
     struct sockaddr_un serv_addr;
     init_unix_socket (&serv_addr, sock_path);
 
-    if (hime_launched_by_compositor ()) {
+    // The compositor does not start its input method again after a normal
+    // exit: take the socket in any case
+    const gboolean replace = hime_launched_by_compositor ();
+    if (replace) {
         replace_running_daemon (&serv_addr);
-        // also one on another display's socket that owns the default one
-        char default_path[UNIX_PATH_MAX];
-        get_hime_im_srv_default_sock_path (default_path, sizeof (default_path));
-        if (default_path[0]) {
-            struct sockaddr_un default_addr;
-            init_unix_socket (&default_addr, default_path);
-            replace_running_daemon (&default_addr);
-        }
-    }
-
-    if (is_sock_path_in_use (&serv_addr)) {
+    } else if (is_sock_path_in_use (&serv_addr)) {
         fprintf (stderr, "hime: another hime is already running on %s\n", sock_path);
         exit (0);
     }
 
     unlink_serv_addr_sock_path (&serv_addr);
 
-    if ((im_sockfd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
+    // not inherited by programs the daemon starts (hime-setup, ...)
+    if ((im_sockfd = socket (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) < 0) {
         perror ("cannot create unix socket");
         exit (-1);
     }
@@ -304,7 +342,7 @@ static void setup_unix_domain_socket (void) {
 
     dbg ("im_sockfd:%d\n", im_sockfd);
 
-    link_default_sock_path (sock_path);
+    link_default_sock_path (sock_path, replace);
 
     g_io_add_watch (g_io_channel_unix_new (im_sockfd),
                     G_IO_IN,
@@ -387,7 +425,7 @@ static void setup_tcp_socket (void) {
     struct sockaddr_in serv_addr_tcp;
     init_tcp_socket (&serv_addr_tcp);
 
-    if ((im_tcp_sockfd = socket (AF_INET, SOCK_STREAM, 0)) < 0) {
+    if ((im_tcp_sockfd = socket (AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)) < 0) {
         perror ("cannot create tcp socket");
         exit (-1);
     }
