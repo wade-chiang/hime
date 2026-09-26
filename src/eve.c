@@ -102,12 +102,17 @@ int force_preedit = 0;
 // change the preedit outside of a key event.  Clients taking notifications
 // get them right away.  Others only receive text in replies: then fake a
 // Shift press with XTest, so that the focused (X11) application sends a key
-// event whose reply carries it (see ProcessKeyPress).
+// event whose reply carries it (see ProcessKeyPress).  Without X, the text
+// waits in the output buffer for the next reply, and the key it answers is
+// still processed.
 
 // the preedit changed
 void force_preedit_shift () {
     if (hime_notify_ready ()) {
         hime_notify_send ();
+        return;
+    }
+    if (!dpy) {
         return;
     }
     send_fake_key_eve (XK_Shift_L);
@@ -116,9 +121,11 @@ void force_preedit_shift () {
 
 // commit text
 void send_text_call_back (char *text) {
-    if (hime_notify_ready ()) {
+    if (hime_notify_ready () || !dpy) {
         send_text (text);
-        hime_notify_send ();
+        if (hime_notify_ready ()) {
+            hime_notify_send ();
+        }
         return;
     }
     callback_str_buffer = (char *) realloc (callback_str_buffer, strlen (text) + 1);
@@ -130,6 +137,9 @@ void send_text_call_back (char *text) {
 void output_buffer_call_back () {
     if (hime_notify_ready ()) {
         hime_notify_send ();
+        return;
+    }
+    if (!dpy) {
         return;
     }
     swap_ptr (&callback_str_buffer, &output_buffer);
