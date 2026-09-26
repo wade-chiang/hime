@@ -578,6 +578,8 @@ static void screen_size_changed (GdkScreen *screen, gpointer user_data) {
 #include "lang.h"
 
 #if HIME_LAYER_SHELL
+#include <poll.h>
+
 #include <wayland-client.h>
 
 static void registry_global (void *data, struct wl_registry *registry,
@@ -590,8 +592,54 @@ static void registry_global (void *data, struct wl_registry *registry,
 static void registry_global_remove (void *data, struct wl_registry *registry, uint32_t name) {
 }
 
+static void sync_done (void *data, struct wl_callback *callback, uint32_t serial) {
+    *(gboolean *) data = TRUE;
+}
+
+// Like wl_display_roundtrip (), but gives up after timeout_ms: a wedged
+// compositor must not hang the daemon forever.
+static gboolean roundtrip_with_timeout (struct wl_display *display, int timeout_ms) {
+    static const struct wl_callback_listener listener = {sync_done};
+    gboolean done = FALSE;
+    struct wl_callback *callback = wl_display_sync (display);
+    wl_callback_add_listener (callback, &listener, &done);
+
+    const gint64 deadline = g_get_monotonic_time () + timeout_ms * 1000;
+    while (!done) {
+        while (wl_display_prepare_read (display) != 0) {
+            wl_display_dispatch_pending (display);
+        }
+        if (done) {
+            wl_display_cancel_read (display);
+            break;
+        }
+        wl_display_flush (display);
+
+        const gint64 left = deadline - g_get_monotonic_time ();
+        struct pollfd pfd = {wl_display_get_fd (display), POLLIN, 0};
+        if (left <= 0 || poll (&pfd, 1, left / 1000) <= 0) {
+            wl_display_cancel_read (display);
+            break;
+        }
+        if (wl_display_read_events (display) < 0) {
+            break;
+        }
+        wl_display_dispatch_pending (display);
+    }
+
+    wl_callback_destroy (callback);
+    return done;
+}
+
 // Does the Wayland compositor we run under support wlr-layer-shell?
 static gboolean wayland_has_layer_shell (void) {
+    // Without these, libwayland would try $XDG_RUNTIME_DIR/wayland-0, which
+    // may belong to another session of the same user (e.g. an X session
+    // started next to a Wayland one).
+    if (!getenv ("WAYLAND_DISPLAY") && !getenv ("WAYLAND_SOCKET")) {
+        return FALSE;
+    }
+
     struct wl_display *display = wl_display_connect (NULL);
     if (!display) {
         return FALSE;
@@ -604,7 +652,11 @@ static gboolean wayland_has_layer_shell (void) {
     gboolean found = FALSE;
     struct wl_registry *registry = wl_display_get_registry (display);
     wl_registry_add_listener (registry, &listener, &found);
-    wl_display_roundtrip (display);
+    // the globals are all announced before the reply to this sync
+    if (!roundtrip_with_timeout (display, 1000)) {
+        fprintf (stderr, "hime: the Wayland compositor did not answer\n");
+        found = FALSE;
+    }
     wl_registry_destroy (registry);
     wl_display_disconnect (display);
     return found;
@@ -616,10 +668,14 @@ static gboolean wayland_has_layer_shell (void) {
 // the daemon's windows keep their place and stay out of the keyboard focus
 // without Xwayland (niri, sway, KDE, ...).  HIME_BACKEND=x11|wayland
 // overrides this.
+#if GTK_CHECK_VERSION(3, 10, 0)
 static const char *choose_backend (void) {
     const char *backend = getenv ("HIME_BACKEND");
     if (backend && (!strcmp (backend, "x11") || !strcmp (backend, "wayland"))) {
         return backend;
+    }
+    if (backend && backend[0]) {
+        fprintf (stderr, "hime: ignoring HIME_BACKEND=%s (use x11 or wayland)\n", backend);
     }
 
 #if HIME_LAYER_SHELL
@@ -629,6 +685,7 @@ static const char *choose_backend (void) {
 #endif
     return "x11";
 }
+#endif
 
 int main (int argc, char **argv) {
     // Daemonize before gtk_init: GTK starts GLib worker threads (GDBus), and
