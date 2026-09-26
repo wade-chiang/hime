@@ -176,13 +176,20 @@ static void mod_fg_all (GtkWidget *label, GdkRGBA *rgbfg) {
 }
 
 // A click on a virtual keyboard key.  With XTest, a real key event reaches
-// the focused (X11) application.  Clients taking notifications get the key
-// typed into the engine directly and the result sent to them; modifiers
-// and keys the engine does not take (BackSpace, arrows, ...) cannot be
-// passed on to the application then.
+// the focused X11 application, modifiers and all.  Clients XTest does not
+// reach (native Wayland applications, or any when the daemon runs without
+// X) get the key typed into the engine and the result as a notification;
+// modifiers and keys the engine does not take (BackSpace, arrows, ...)
+// cannot be passed on to the application then.
 void win_kbm_send_key (const KeySym key, const gboolean press) {
-    if (hime_notify_ready ()) {
+    ClientState *focused = hime_focused_client ();
+    const gboolean engine = hime_notify_ready () && focused &&
+                            (!dpy || !focused->client_win);
+
+    // a modifier held with XTest is released with XTest, whoever is focused
+    if (engine && !(dpy && IsModifierKey (key) && !press)) {
         if (press && !IsModifierKey (key)) {
+            current_CS = focused;
             if (!ProcessKeyPress (key, 0) && key >= ' ' && key < 0x7f) {
                 send_ascii ((char) key);
             }
