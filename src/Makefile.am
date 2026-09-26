@@ -297,6 +297,11 @@ $(GTK3_TEXT_INPUT_TEST): ../tests/session/text-input-test.c
 $(GTK4_TEXT_INPUT_TEST): ../tests/session/text-input-test.c
 	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk4`
 
+QT6_TEXT_INPUT_TEST = ../tests/session/qt6-text-input-test
+
+$(QT6_TEXT_INPUT_TEST): ../tests/session/qt-text-input-test.cpp
+	$(CXX) -std=c++17 -Wall -fPIC -o $@ $< `pkg-config --cflags --libs Qt6Widgets`
+
 $(WL_TYPE): ../tests/session/wl-type.c virtual-keyboard-unstable-v1-client-protocol.h \
 		virtual-keyboard-unstable-v1-protocol.c
 	$(CC) -Wall -I. -o $@ $< virtual-keyboard-unstable-v1-protocol.c \
@@ -314,6 +319,7 @@ session-test-programs: $(HIME_CLIENT_TEST) $(WL_IM_TESTS)
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im qt-im-test; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im qt-im-test; fi
 	if [ -n "$(WL_IM_TESTS)" ] && pkg-config --exists gtk4; then $(MAKE) $(GTK4_TEXT_INPUT_TEST); fi
+	if [ -n "$(WL_IM_TESTS)" ] && pkg-config --exists Qt6Widgets; then $(MAKE) $(QT6_TEXT_INPUT_TEST); fi
 
 hime-tslearn: $(OBJS_TSLEARN) im-client/libhime-im-client.so
 	@echo "linking $@ ..."
@@ -459,7 +465,7 @@ clean:
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
 		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
 		$(GTK3_IM_TEST) $(GTK4_IM_TEST) $(GTK3_TEXT_INPUT_TEST) \
-		$(GTK4_TEXT_INPUT_TEST) $(WL_TYPE) \
+		$(GTK4_TEXT_INPUT_TEST) $(QT6_TEXT_INPUT_TEST) $(WL_TYPE) \
 		*-client-protocol.h *-protocol.c
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;
 

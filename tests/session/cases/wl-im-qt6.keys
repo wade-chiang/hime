@@ -1,0 +1,7 @@
+@program qt6-text-input-test
+@compositor sway
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# A Qt 6 application using text-input (QT_IM_MODULE=wayland).  BackSpace
+# takes back the keys typed, then reaches the application.
+b 1 a @check <space> b c @check <bs> <bs> <bs> S-h
