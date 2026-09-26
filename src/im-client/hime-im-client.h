@@ -134,6 +134,12 @@ void hime_im_client_send_message (HIME_client_handle *handle,
 // hime_im_client_read_notify ().
 int hime_im_client_enable_notify (HIME_client_handle *handle);
 int hime_im_client_get_fd (HIME_client_handle *handle);
+// TRUE if the daemon sends notifications (again after reconnecting)
+int hime_im_client_notify_ok (HIME_client_handle *handle);
+// TRUE if notifications arrived while waiting for another reply: they
+// wait for hime_im_client_read_notify (), the connection's fd will not
+// report them
+int hime_im_client_notify_pending (HIME_client_handle *handle);
 // TRUE if notifications arrived; then *commit is text to commit (to be
 // freed) or NULL, and the preedit should be refreshed.  Never blocks.  It
 // also hands out notifications received while waiting for other replies,

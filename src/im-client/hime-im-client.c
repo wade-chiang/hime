@@ -43,7 +43,11 @@
 #define DBG 0
 
 // will be restored in hime_im_client_reopen
-static int flags_backup;
+// the flags a handle asked for with set_flags, which it asks for again
+// after reconnecting; they are kept in handle->flag
+#define REQUESTED_FLAGS \
+    (FLAG_HIME_client_handle_use_preedit | FLAG_HIME_client_handle_raise_window | \
+     FLAG_HIME_client_handle_notify)
 
 static int __is_special_user;
 static void init_is_special_user (void) {
@@ -355,14 +359,11 @@ next:;
             hime_im_client_focus_in (handle);
         }
 
+        // a new daemon: ask again for what this handle asked for
         int rstatus = 0;
-        hime_im_client_set_flags (handle, flags_backup, &rstatus);
-
-        // a new daemon: ask again
-        if (BITON (handle->flag, FLAG_HIME_client_handle_notify)) {
-            hime_im_client_set_flags (handle, FLAG_HIME_client_handle_notify, &rstatus);
-            handle->notify_ok = BITON (rstatus, FLAG_HIME_srv_ret_status_notify);
-        }
+        hime_im_client_set_flags (handle, handle->flag & REQUESTED_FLAGS, &rstatus);
+        handle->notify_ok = BITON (handle->flag, FLAG_HIME_client_handle_notify) &&
+                            BITON (rstatus, FLAG_HIME_srv_ret_status_notify);
     }
 
     return handle;
@@ -935,7 +936,7 @@ void hime_im_client_set_flags (HIME_client_handle *handle,
 
     req.flag |= flags;
 
-    flags_backup = req.flag;
+    handle->flag |= flags & REQUESTED_FLAGS;
 
     if (handle_write (handle, &req, sizeof (req)) <= 0) {
         error_proc (handle, "hime_im_client_set_flags error");
@@ -961,7 +962,7 @@ void hime_im_client_clear_flags (HIME_client_handle *handle,
 
     req.flag &= ~flags;
 
-    flags_backup = req.flag;
+    handle->flag &= ~(flags & REQUESTED_FLAGS);
 
     if (handle_write (handle, &req, sizeof (req)) <= 0) {
         error_proc (handle, "hime_im_client_clear_flags error");
@@ -1008,8 +1009,6 @@ int hime_im_client_enable_notify (HIME_client_handle *handle) {
         return FALSE;
     }
 
-    handle->flag |= FLAG_HIME_client_handle_notify;
-
     int ret_flag = 0;
     hime_im_client_set_flags (handle, FLAG_HIME_client_handle_notify, &ret_flag);
     handle->notify_ok = BITON (ret_flag, FLAG_HIME_srv_ret_status_notify);
@@ -1018,6 +1017,14 @@ int hime_im_client_enable_notify (HIME_client_handle *handle) {
 
 int hime_im_client_get_fd (HIME_client_handle *handle) {
     return handle && handle->fd > 0 ? handle->fd : 0;
+}
+
+int hime_im_client_notify_ok (HIME_client_handle *handle) {
+    return handle && handle->notify_ok;
+}
+
+int hime_im_client_notify_pending (HIME_client_handle *handle) {
+    return handle && handle->notify_pending;
 }
 
 int hime_im_client_read_notify (HIME_client_handle *handle, char **commit) {
