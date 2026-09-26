@@ -26,8 +26,9 @@
  *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).  @1 and @2 move the focus to the first or a second client
  *   connection (two text fields, both without an X window); @new closes
  *   the focused connection and focuses a new one in its place (an
- *   application quits, another starts).  -m sends a daemon message (as
- *   hime-setup does) first.
+ *   application quits, another starts).  @sleep MS waits, keeping the
+ *   connection open.  -m sends a daemon message (as hime-setup does)
+ *   first.
  * Exit status: 0 if connected, 1 if no daemon could be reached.
  */
 
@@ -35,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
@@ -98,6 +100,11 @@ int main (int argc, char **argv) {
     hime_im_client_focus_in (handle);
 
     for (; argi < argc; argi++) {
+        if (!strcmp (argv[argi], "@sleep") && argi + 1 < argc) {
+            usleep (atoi (argv[++argi]) * 1000);
+            continue;
+        }
+
         if (!strcmp (argv[argi], "@new")) {
             const int i = handle == clients[0] ? 0 : 1;
             hime_im_client_close (handle);

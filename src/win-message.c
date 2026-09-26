@@ -32,6 +32,7 @@ extern gboolean is_exist_tray_double ();
 
 static void create_win_message (char *icon, char *text, int duration) {
     GtkWidget *gwin_message = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    hime_window_init (gwin_message, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (gwin_message), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (gwin_message), 0);
     gtk_widget_realize (gwin_message);
@@ -111,7 +112,7 @@ static void create_win_message (char *icon, char *text, int duration) {
         oy = display_height - height;
     }
 
-    gtk_window_move (GTK_WINDOW (gwin_message), ox, oy);
+    hime_window_move (gwin_message, ox, oy);
 
     g_timeout_add (duration, (GSourceFunc) timeout_destroy_window, gwin_message);
 }

@@ -96,6 +96,7 @@ gboolean timeout_update_stat (gpointer data) {
 
 void create_stat_win () {
     gwin_stat = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    hime_window_init (gwin_stat, FALSE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (gwin_stat), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (gwin_stat), 0);
     gtk_widget_realize (gwin_stat);

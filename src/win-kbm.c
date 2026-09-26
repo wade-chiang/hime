@@ -263,6 +263,8 @@ static void create_win_kbm (void) {
     gdk_rgba_parse (&red, "red");
 
     win_kbm = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+
+    hime_window_init (win_kbm, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (win_kbm), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (win_kbm), 0);
 
@@ -371,7 +373,7 @@ static void move_win_kbm (void) {
         oy = display_height - height - 16;
     }
 
-    gtk_window_move (GTK_WINDOW (win_kbm), ox, oy);
+    hime_window_move (win_kbm, ox, oy);
 }
 
 void show_win_kbm (void) {

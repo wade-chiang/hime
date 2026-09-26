@@ -182,6 +182,10 @@ void apply_widget_fg_color (GtkWidget *widget);
 void set_label_font_size (GtkWidget *label, int size);
 void set_label_space (GtkWidget *label);
 void set_no_focus (GtkWidget *win);
+gboolean hime_use_layer_shell (void);
+void hime_window_init (GtkWidget *win, gboolean positioned);
+void hime_window_move (GtkWidget *win, int x, int y);
+void hime_window_get_position (GtkWidget *win, int *x, int *y);
 GdkDisplay *get_default_display (void);
 #if GTK_CHECK_VERSION(3, 0, 0)
 GdkMonitor *get_primary_monitor (void);

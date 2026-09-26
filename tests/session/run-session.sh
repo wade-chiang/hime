@@ -16,17 +16,24 @@
 # With HIME_SESSION_DAEMON_BACKEND=wayland the daemon runs on GDK's Wayland
 # backend with no X display at all.
 #
+# With HIME_SESSION_COMPOSITOR=sway the session is a headless sway instead:
+# it supports layer-shell, has no Xwayland, and the daemon runs on the
+# Wayland backend.  Screenshots can be taken with grim.
+#
 # GTK and Qt applications pick up the HIME IM modules from the build tree.
 # With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
 # Xwayland instead.
 
 set -euo pipefail
+[[ -n "${HIME_SESSION_TRACE:-}" ]] && set -x
 
 here="$(cd "$(dirname "$0")" && pwd)"
 top="$(cd "$here/../.." && pwd)"
 
 if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
-    for bin in mutter dbus-run-session; do
+    compositor=mutter
+    [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]] && compositor=sway
+    for bin in "$compositor" dbus-run-session; do
         if ! command -v "$bin" >/dev/null; then
             echo "run-session.sh: $bin not found" >&2
             exit 77
@@ -58,10 +65,20 @@ fi
 # ---- inside the private dbus session ----------------------------------------
 
 tmp="$HIME_SESSION_TMP"
-log="$tmp/mutter.log"
+log="$tmp/compositor.log"
 
-mutter --headless --wayland --wayland-display=wl-hime-test \
-    --virtual-monitor 1280x800 >"$log" 2>&1 &
+if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
+    printf '%s\n' 'output HEADLESS-1 resolution 1280x800' \
+        'xwayland disable' >"$tmp/sway.config"
+    # sway names its socket itself (wayland-N, the only one in our
+    # private XDG_RUNTIME_DIR); there is no swaybg for the background
+    WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
+        WLR_RENDERER=pixman sway -c "$tmp/sway.config" >"$log" 2>&1 &
+    HIME_SESSION_DAEMON_BACKEND=wayland
+else
+    mutter --headless --wayland --wayland-display=wl-hime-test \
+        --virtual-monitor 1280x800 >"$log" 2>&1 &
+fi
 mutter_pid=$!
 
 # the daemonized hime of this session (it is not our child)
@@ -90,20 +107,30 @@ wait_for() {
     return 1
 }
 
-if ! wait_for '[[ -S "$XDG_RUNTIME_DIR/wl-hime-test" ]] && grep -q "public X11 display" "$log"'; then
-    echo "run-session.sh: mutter did not start" >&2
+if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
+    started='compgen -G "$XDG_RUNTIME_DIR/wayland-[0-9]" >/dev/null'
+else
+    started='[[ -S "$XDG_RUNTIME_DIR/wl-hime-test" ]] && grep -q "public X11 display" "$log"'
+fi
+if ! wait_for "$started"; then
+    echo "run-session.sh: the compositor did not start" >&2
     cat "$log" >&2
     exit 1
 fi
 
+wl_display=wl-hime-test
+if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
+    wl_display="$(basename "$(compgen -G "$XDG_RUNTIME_DIR/wayland-[0-9]" | head -1)")"
+fi
+
 x_display="$(sed -n 's/.*Using public X11 display \(:[0-9]*\).*/\1/p' "$log" | head -1)"
-x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1)"
+x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1 || true)"
 
 # The daemon still needs X for its windows; it picks the X11 backend
 # itself, which run-session.sh relies on by not setting GDK_BACKEND.
 # HIME_DAEMON makes it daemonize, as when a client starts it.
 if [[ "${HIME_SESSION_DAEMON_BACKEND:-}" == wayland ]]; then
-    env -u DISPLAY WAYLAND_DISPLAY=wl-hime-test HIME_BACKEND=wayland HIME_DAEMON=1 \
+    env -u DISPLAY WAYLAND_DISPLAY="$wl_display" HIME_BACKEND=wayland HIME_DAEMON=1 \
         HIME_TABLE_DIR="$top/data" \
         "$top/src/hime" >"$tmp/hime.log" 2>&1 </dev/null
 else
@@ -118,7 +145,7 @@ if ! wait_for '[[ -S "$XDG_RUNTIME_DIR/hime/hime.socket" ]]'; then
     exit 1
 fi
 
-export WAYLAND_DISPLAY=wl-hime-test
+export WAYLAND_DISPLAY="$wl_display"
 export LD_LIBRARY_PATH="$top/src/im-client${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export HIME_IM_CLIENT_NO_AUTO_EXEC=1
 

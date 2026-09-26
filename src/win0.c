@@ -69,6 +69,7 @@ void init_win0 () {
     if (win0)
         return;
     win0 = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    hime_window_init (win0, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (win0), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (win0), 0);
     gtk_widget_realize (win0);
@@ -337,7 +338,7 @@ int get_widget_xy (GtkWidget *win, GtkWidget *widget, int *rx, int *ry) {
 
     int win_x, win_y;
 
-    gtk_window_get_position (GTK_WINDOW (win), &win_x, &win_y);
+    hime_window_get_position (win, &win_x, &win_y);
     int input_window_width, input_window_height;
     get_win_size (win, &input_window_width, &input_window_height);
 

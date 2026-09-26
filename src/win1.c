@@ -76,6 +76,8 @@ void create_win1 () {
         return;
 
     gwin1 = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+
+    hime_window_init (gwin1, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (gwin1), FALSE);
     gtk_widget_realize (gwin1);
 
@@ -342,7 +344,7 @@ void disp_selections (int x, int y) {
     if (!gtk_widget_get_visible (gwin1)) {
         gtk_widget_show (gwin1);
     }
-    gtk_window_move (GTK_WINDOW (gwin1), x, y);
+    hime_window_move (gwin1, x, y);
 }
 
 void hide_selections_win () {

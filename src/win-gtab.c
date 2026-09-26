@@ -247,6 +247,8 @@ void create_win_gtab () {
         return;
 
     win_gtab = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+
+    hime_window_init (win_gtab, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (win_gtab), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (win_gtab), 0);
     gtk_widget_realize (win_gtab);

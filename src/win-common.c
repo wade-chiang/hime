@@ -21,6 +21,76 @@
 
 #include "win-common.h"
 
+#if HIME_LAYER_SHELL
+#include <gtk-layer-shell.h>
+#endif
+
+// On the Wayland backend (no X display) with a compositor supporting
+// wlr-layer-shell, the daemon's windows are layer surfaces: they never take
+// the keyboard focus and are placed by anchoring them to the top-left corner
+// of the output with margins, as windows cannot position themselves there.
+gboolean hime_use_layer_shell (void) {
+#if HIME_LAYER_SHELL
+    static int use = -1;
+    if (use < 0) {
+        use = !dpy && gtk_layer_is_supported ();
+    }
+    return use;
+#else
+    return FALSE;
+#endif
+}
+
+// Call right after gtk_window_new, before the window is realized.  A
+// positioned window is moved with hime_window_move; other windows are
+// centered.
+void hime_window_init (GtkWidget *win, gboolean positioned) {
+#if HIME_LAYER_SHELL
+    if (!hime_use_layer_shell ()) {
+        return;
+    }
+
+    GtkWindow *window = GTK_WINDOW (win);
+    gtk_layer_init_for_window (window);
+    gtk_layer_set_namespace (window, "hime");
+    gtk_layer_set_layer (window, GTK_LAYER_SHELL_LAYER_OVERLAY);
+    gtk_layer_set_keyboard_mode (window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
+    // margins count from the output edges, not from other surfaces' zones
+    gtk_layer_set_exclusive_zone (window, -1);
+
+    if (positioned) {
+        gtk_layer_set_anchor (window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);
+        gtk_layer_set_anchor (window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
+    }
+#endif
+}
+
+void hime_window_move (GtkWidget *win, int x, int y) {
+#if HIME_LAYER_SHELL
+    if (hime_use_layer_shell ()) {
+        GtkWindow *window = GTK_WINDOW (win);
+        gtk_layer_set_margin (window, GTK_LAYER_SHELL_EDGE_LEFT, x);
+        gtk_layer_set_margin (window, GTK_LAYER_SHELL_EDGE_TOP, y);
+        // the compositor does not tell where a surface is: remember it
+        g_object_set_data (G_OBJECT (win), "hime-x", GINT_TO_POINTER (x));
+        g_object_set_data (G_OBJECT (win), "hime-y", GINT_TO_POINTER (y));
+        return;
+    }
+#endif
+    gtk_window_move (GTK_WINDOW (win), x, y);
+}
+
+void hime_window_get_position (GtkWidget *win, int *x, int *y) {
+#if HIME_LAYER_SHELL
+    if (hime_use_layer_shell ()) {
+        *x = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (win), "hime-x"));
+        *y = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (win), "hime-y"));
+        return;
+    }
+#endif
+    gtk_window_get_position (GTK_WINDOW (win), x, y);
+}
+
 char *get_full_str () {
     if (!chinese_mode ()) {
         if (hime_use_custom_theme)
@@ -48,7 +118,7 @@ char *get_full_str () {
 void get_win_geom (GtkWidget *win) {
     if (!win)
         return;
-    gtk_window_get_position (GTK_WINDOW (win), &win_x, &win_y);
+    hime_window_get_position (win, &win_x, &win_y);
     get_win_size (win, &input_window_width, &input_window_height);
 }
 
@@ -71,7 +141,7 @@ void move_win (GtkWidget *win, int x, int y) {
     if (y < 0)
         best_win_y = 0;
 
-    gtk_window_move (GTK_WINDOW (win), best_win_x, best_win_y);
+    hime_window_move (win, best_win_x, best_win_y);
 
     win_x = best_win_x;
     win_y = best_win_y;

@@ -13,6 +13,9 @@
 #   @exit N         the client's expected exit status (default 0)
 #   @env VAR=VALUE  set an environment variable for the client
 #   @daemon-wayland run the daemon on GDK's Wayland backend, without X
+#   @compositor sway run in a headless sway (layer-shell, no Xwayland)
+#                   instead of mutter
+#   @conf NAME=VALUE write a hime config value
 #
 # Usage: run-tests.sh [--update] [CASE.keys...]
 # Exits 77 (skipped) when mutter is not available.
@@ -56,6 +59,8 @@ for keys in "${cases[@]}"; do
     exit_status=0
     envs=()
     daemon_backend=""
+    compositor=""
+    confs=""
     while read -r directive arg; do
         case "$directive" in
         @program) program="$arg" ;;
@@ -64,6 +69,8 @@ for keys in "${cases[@]}"; do
         @exit) exit_status="$arg" ;;
         @env) envs+=("$arg") ;;
         @daemon-wayland) daemon_backend=wayland ;;
+        @compositor) compositor="$arg" ;;
+        @conf) confs="$confs $arg" ;;
         esac
     done < <(grep '^@' "$keys")
 
@@ -83,6 +90,7 @@ for keys in "${cases[@]}"; do
 
     status=0
     HIME_SESSION_X11="$x11" HIME_SESSION_DAEMON_BACKEND="$daemon_backend" \
+        HIME_SESSION_COMPOSITOR="$compositor" HIME_CONF="$confs" \
         "$here/run-session.sh" "${cmd[@]}" \
         >"$tmp/$name.actual" 2>"$tmp/$name.stderr" || status=$?
     if [[ $status -ne $exit_status ]]; then

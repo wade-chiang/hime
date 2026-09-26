@@ -275,7 +275,7 @@ void move_win_sym () {
             wy = 0;
     }
 
-    gtk_window_move (GTK_WINDOW (win_sym), wx, wy);
+    hime_window_move (win_sym, wx, wy);
 }
 
 void hide_win_sym () {
@@ -410,6 +410,8 @@ void create_win_sym () {
     }
 
     win_sym = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+
+    hime_window_init (win_sym, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (win_sym), FALSE);
 
     GtkWidget *hbox_top = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);

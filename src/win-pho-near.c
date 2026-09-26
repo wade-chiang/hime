@@ -93,6 +93,8 @@ void create_win_pho_near (phokey_t pho) {
         close_win_pho_near ();
 
     win_pho_near = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+
+    hime_window_init (win_pho_near, FALSE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (win_pho_near), FALSE);
     gtk_widget_realize (win_pho_near);
     set_no_focus (win_pho_near);

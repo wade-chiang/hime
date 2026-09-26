@@ -99,6 +99,8 @@ void create_win_pho () {
         return;
 
     win_pho = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+
+    hime_window_init (win_pho, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (win_pho), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (win_pho), 0);
     gtk_widget_realize (win_pho);

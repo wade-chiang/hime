@@ -62,6 +62,8 @@ void create_phrase_save_menu (GdkEventButton *event) {
         return;
 
     phrase_save_win = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+
+    hime_window_init (phrase_save_win, TRUE);
     gtk_window_set_has_resize_grip (GTK_WINDOW (phrase_save_win), FALSE);
     gtk_widget_realize (phrase_save_win);
 
@@ -106,5 +108,5 @@ void create_phrase_save_menu (GdkEventButton *event) {
     if (y + w_yl > display_height)
         y = win_y - w_yl;
 
-    gtk_window_move (GTK_WINDOW (phrase_save_win), x, y);
+    hime_window_move (phrase_save_win, x, y);
 }

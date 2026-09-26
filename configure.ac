@@ -457,6 +457,35 @@ AS_IF(
   ]
 )
 AM_CONDITIONAL([USE_UNITY_TRAY], [test "x$appindicator_is_installed" = "xyes" -a "x$enable_appindicator" == "xyes"])
+# LAYER_SHELL: show the daemon's windows as wlr-layer-shell surfaces when it
+# runs on GDK's Wayland backend (GTK 3 only)
+AS_IF(
+  [test "x$with_gtk" = "x3.0"],
+  [PKG_CHECK_MODULES(
+    [LAYER_SHELL],
+    [gtk-layer-shell-0 >= 0.6],
+    [layer_shell_is_installed=yes],
+    [layer_shell_is_installed=no]
+  )],
+  [layer_shell_is_installed=no]
+)
+AC_ARG_ENABLE(
+  [layer-shell],
+  [AS_HELP_STRING([--enable-layer-shell], [Enable gtk-layer-shell windows on Wayland, default is auto-detect])],
+  [enable_layer_shell=$enableval],
+  [enable_layer_shell=$layer_shell_is_installed]
+)
+AS_IF(
+  [test "x$enable_layer_shell" = "xyes"],
+  [
+    AS_IF(
+      [test "x$layer_shell_is_installed" = "xno"],
+      [AC_MSG_ERROR([Require GTK 3 and gtk-layer-shell (>= 0.6) installed])]
+    )
+    AC_SUBST([GTKINC], ["$GTKINC $LAYER_SHELL_CFLAGS -DHIME_LAYER_SHELL=1"])
+    AC_SUBST([GTKLDFLAGS], ["$GTKLDFLAGS $LAYER_SHELL_LIBS"])
+  ]
+)
 LDFLAGS+=" $GTKLDFLAGS"
 AS_IF(
   [test "x$FREEBSD" = "x0"],
