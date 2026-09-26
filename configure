@@ -6348,7 +6348,7 @@ then :
   enableval=$enable_anthy; enable_anthy=$enableval
 else case e in #(
   e)
-    if test "x$anthy_is_installed" = "yes"
+    if test "x$anthy_is_installed" = "xyes"
 then :
   enable_anthy=yes
 else case e in #(
@@ -6455,7 +6455,7 @@ then :
   enableval=$enable_chewing; enable_chewing=$enableval
 else case e in #(
   e)
-    if test "x$chewing_is_installed" = "yes"
+    if test "x$chewing_is_installed" = "xyes"
 then :
   enable_chewing=yes
 else case e in #(

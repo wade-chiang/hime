@@ -399,7 +399,7 @@ AC_ARG_ENABLE(
   [enable_anthy=$enableval],
   [
     AS_IF(
-      [test "x$anthy_is_installed" = "yes"],
+      [test "x$anthy_is_installed" = "xyes"],
       [enable_anthy=yes],
       [enable_anthy=no]
     )
@@ -423,7 +423,7 @@ AC_ARG_ENABLE(
   [enable_chewing=$enableval],
   [
     AS_IF(
-      [test "x$chewing_is_installed" = "yes"],
+      [test "x$chewing_is_installed" = "xyes"],
       [enable_chewing=yes],
       [enable_chewing=no]
     )
