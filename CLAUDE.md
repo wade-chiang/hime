@@ -222,6 +222,11 @@ Known gaps after phase 1 (from review, not fixed yet):
   acting on "the" input window should use `hime_focused_client ()`.
 - `change_win0_style ()` recreates win0 on the first settings reload
   (its `current_hime_inner_frame` starts at 0).
+- Ghostty is single-instance: launching it again with another
+  environment (e.g. `env -u GTK_IM_MODULE`) opens a window of the running
+  process, which keeps its IM module; use `--gtk-single-instance=false`.
+  In headless sway Ghostty never sends text-input `enable` (on niri it
+  does), so it is not used in session tests.
 - GDK dispatches Wayland events re-entrantly while a window is shown
   (e.g. HIME's window popping up on a key press): `src/wl-im.c` queues
   grab and input method events and handles them one at a time.

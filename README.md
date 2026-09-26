@@ -38,6 +38,8 @@ HIME 作為 Wayland 輸入法（text-input 程式，不經 HIME module）：
 | Qt 6（`QT_IM_MODULE=wayland`） | sway | FeatherPad（niri 26.04） |
 | 其他 text-input 程式 | — | foot（niri 26.04） |
 
+以上三個程式在 niri 26.04 上也實測過「跟著游標」：HIME 的輸入視窗出現在文字游標下方。
+
 ### 安裝
 
 Arch Linux：
@@ -93,6 +95,8 @@ HIME 也會成為合成器的輸入法，兩種方式可以同時使用：
 
 - 有設定 `GTK_IM_MODULE=hime`、`QT_IM_MODULE=hime` 的程式，照舊透過 HIME 的 IM module 輸入。
 - 其他使用 text-input 的程式（foot、Chromium 等）直接透過合成器輸入。若想讓 GTK、Qt 程式也改走這條路，可以不設定上述變數，或設為 `GTK_IM_MODULE=wayland`、`QT_IM_MODULE=wayland`。
+
+Ghostty 預設只跑一個程式實例：已經有 Ghostty 在執行時，用不同環境變數再開，只會在原本的程式裡多開一個視窗，沿用原本的設定。要測試時可加上 `--gtk-single-instance=false`。
 
 同一時間只能有一個輸入法；若 fcitx5 或 IBus 已經佔用，HIME 會顯示「another Wayland input method is running」，只提供 IM module 的方式。設定 `HIME_NO_WAYLAND_IM=1` 可以關閉這個功能。
 
