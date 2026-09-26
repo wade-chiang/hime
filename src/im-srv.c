@@ -17,7 +17,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+// struct ucred
+#define _GNU_SOURCE
+
+#include <signal.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -150,6 +155,40 @@ static gboolean is_sock_path_in_use (const struct sockaddr_un *serv_addr) {
     return in_use;
 }
 
+// Started by the compositor as its input method, the daemon replaces one
+// that is already running (e.g. started by an IM module), which cannot get
+// the compositor's input method connection: ask the daemon listening on
+// ADDR to exit, and wait until it has.  Clients connect again by themselves.
+static void replace_running_daemon (const struct sockaddr_un *addr) {
+    const int sockfd = socket (AF_UNIX, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        return;
+    }
+    // the process that listens on it
+    struct ucred cred = {0};
+    socklen_t len = sizeof (cred);
+    const gboolean found =
+        connect (sockfd, (const struct sockaddr *) addr, SUN_LEN (addr)) == 0 &&
+        getsockopt (sockfd, SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0;
+    close (sockfd);
+    if (!found || cred.pid <= 0 || cred.pid == getpid () || cred.uid != getuid ()) {
+        return;
+    }
+
+    fprintf (stderr, "hime: replacing the hime already running (pid %d)\n", (int) cred.pid);
+    kill (cred.pid, SIGTERM);
+    for (int i = 0; i < 50; i++) {
+        if (!is_sock_path_in_use (addr)) {
+            return;
+        }
+        usleep (100000);
+    }
+    kill (cred.pid, SIGKILL);
+    for (int i = 0; i < 20 && is_sock_path_in_use (addr); i++) {
+        usleep (100000);
+    }
+}
+
 // Point the session's default socket, used by clients without DISPLAY, at
 // ours unless another live daemon already owns it.
 static void link_default_sock_path (const char *sock_path) {
@@ -227,6 +266,18 @@ static void setup_unix_domain_socket (void) {
 
     struct sockaddr_un serv_addr;
     init_unix_socket (&serv_addr, sock_path);
+
+    if (hime_launched_by_compositor ()) {
+        replace_running_daemon (&serv_addr);
+        // also one on another display's socket that owns the default one
+        char default_path[UNIX_PATH_MAX];
+        get_hime_im_srv_default_sock_path (default_path, sizeof (default_path));
+        if (default_path[0]) {
+            struct sockaddr_un default_addr;
+            init_unix_socket (&default_addr, default_path);
+            replace_running_daemon (&default_addr);
+        }
+    }
 
     if (is_sock_path_in_use (&serv_addr)) {
         fprintf (stderr, "hime: another hime is already running on %s\n", sock_path);

@@ -107,6 +107,10 @@ char *half_char_to_full_char (KeySym xkey) {
 void message_cb (char *message) {
 }
 
+gboolean hime_launched_by_compositor (void) {
+    return FALSE;
+}
+
 /* ---- gtab window, normally win-gtab.c --------------------------------- */
 
 GtkWidget *win_gtab;

@@ -1,0 +1,6 @@
+@program compositor-launch.sh
+@compositor sway
+# A daemon started by the compositor as its input method (KWin does so,
+# with WAYLAND_SOCKET) replaces the one already running, e.g. started by an
+# IM module; clients connect to it again.
+b 1 a <space>

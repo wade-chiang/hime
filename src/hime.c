@@ -656,10 +656,11 @@ static gboolean roundtrip_with_timeout (struct wl_display *display, int timeout_
 
 // Does the Wayland compositor we run under support wlr-layer-shell?
 static gboolean wayland_has_layer_shell (void) {
-    // Without these, libwayland would try $XDG_RUNTIME_DIR/wayland-0, which
+    // Without this, libwayland would try $XDG_RUNTIME_DIR/wayland-0, which
     // may belong to another session of the same user (e.g. an X session
-    // started next to a Wayland one).
-    if (!getenv ("WAYLAND_DISPLAY") && !getenv ("WAYLAND_SOCKET")) {
+    // started next to a Wayland one).  (Not WAYLAND_SOCKET: see
+    // hime_launched_by_compositor ().)
+    if (!getenv ("WAYLAND_DISPLAY")) {
         return FALSE;
     }
 
@@ -693,6 +694,11 @@ static gboolean wayland_has_layer_shell (void) {
 // overrides this.
 #if GTK_CHECK_VERSION(3, 10, 0)
 static const char *choose_backend (void) {
+    // The compositor's own connection for us: GDK must take it
+    if (hime_launched_by_compositor ()) {
+        return "wayland";
+    }
+
     const char *backend = getenv ("HIME_BACKEND");
     if (backend && (!strcmp (backend, "x11") || !strcmp (backend, "wayland"))) {
         return backend;
@@ -710,11 +716,25 @@ static const char *choose_backend (void) {
 }
 #endif
 
+static gboolean launched_by_compositor;
+
+// Did the compositor start the daemon as its input method (KWin: System
+// Settings, Virtual Keyboard)?  It then hands over a connection of its own
+// in WAYLAND_SOCKET, the only one offering the input method protocol.  It
+// can be used once (libwayland unsets the variable), so nothing may probe
+// it before GDK connects; and the daemon stays in the foreground, the
+// process the compositor watches and restarts after a crash.
+gboolean hime_launched_by_compositor (void) {
+    return launched_by_compositor;
+}
+
 int main (int argc, char **argv) {
+    launched_by_compositor = getenv ("WAYLAND_SOCKET") != NULL;
+
     // Daemonize before gtk_init: GTK starts GLib worker threads (GDBus), and
     // a child forked after that only has the main thread, so it hangs on the
     // first D-Bus call (e.g. gvfs, while loading the theme).
-    if (getenv ("HIME_DAEMON")) {
+    if (getenv ("HIME_DAEMON") && !launched_by_compositor) {
         daemon (1, 1);
 #if FREEBSD
         setpgid (0, getpid ());

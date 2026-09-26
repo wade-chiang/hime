@@ -183,6 +183,7 @@ void set_label_font_size (GtkWidget *label, int size);
 void set_label_space (GtkWidget *label);
 void set_no_focus (GtkWidget *win);
 gboolean hime_use_layer_shell (void);
+gboolean hime_launched_by_compositor (void);
 void hime_window_init (GtkWidget *win, gboolean positioned);
 void hime_window_move (GtkWidget *win, int x, int y);
 void hime_window_get_position (GtkWidget *win, int *x, int *y);
