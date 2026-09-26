@@ -150,6 +150,15 @@ Known gaps after phase 1 (from review, not fixed yet):
   started its GDBus worker threads hangs the child.
 - GNOME sets `XMODIFIERS=@im=ibus` and `QT_IM_MODULE=ibus` in the
   session; HIME only takes an `@im=` name starting with `hime`.
+- gnome-session also sets `QT_IM_MODULES=wayland;ibus` in the systemd
+  user manager; Qt 6 prefers it over `QT_IM_MODULE`, and it survives into
+  other sessions (niri) while the user manager lives. Users need
+  `QT_IM_MODULES=hime` too.
+- Until the daemon draws through layer-shell, niri shows its X11 windows
+  (app-id `Hime`) through xwayland-satellite as ordinary windows that take
+  the focus. A niri window rule works around it:
+  `match app-id="(?i)^hime$"`, `open-focused false`, `open-floating true`,
+  `default-floating-position ... relative-to="bottom-left"`.
 - `~/.config/environment.d` is only read when the systemd user manager
   starts, which may outlive GNOME logins (e.g. a tmux/ssh session).
 - Test in the user's real GNOME session from a shell by taking
