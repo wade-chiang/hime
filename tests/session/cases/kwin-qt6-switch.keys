@@ -1,0 +1,8 @@
+@program qt6-text-input-test
+@compositor kwin
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# Qt 6 (text-input-v2 in KWin) moving to another line of the same window:
+# KWin keeps the context but resets it, and the keys typed into the first
+# line are dropped, as for GTK (kwin-switch).
+--two b c @check <tab> @check a <space>

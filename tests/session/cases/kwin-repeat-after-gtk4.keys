@@ -1,0 +1,8 @@
+@program sequence.sh
+@compositor kwin
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# KWin repeats held keys itself for GTK 4 applications, not for GTK 3
+# ones (each keyboard grab says so): after a GTK 4 application, HIME still
+# repeats keys it handles in a GTK 3 one (as kwin-repeat).
+gtk4-text-input-test a @hold a -- gtk3-text-input-test a <space> a <space> b c d @check @hold <bs>

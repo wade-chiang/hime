@@ -21,7 +21,9 @@
  * Wayland text-input support (QT_IM_MODULE=wayland), typed into with real
  * key events from wl-type.
  *
- * Usage: qt6-text-input-test TOKEN...
+ * Usage: qt6-text-input-test [--two] TOKEN...
+ *   --two  a second line after the first (<tab> moves there); its text is
+ *          printed too
  *   TOKEN is a key for wl-type (see wl-type.c), or @check to print the
  *   line's text and preedit.  They are printed once more at the end.
  */
@@ -36,6 +38,7 @@
 #include <QtGui/QInputMethodEvent>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QLineEdit>
+#include <QtWidgets/QVBoxLayout>
 
 class LineEdit : public QLineEdit {
   public:
@@ -50,11 +53,14 @@ class LineEdit : public QLineEdit {
 
 static QStringList tokens;
 static QString dir;
-static LineEdit *edit;
+static LineEdit *edit, *edit2;
 
 static void print_state (void) {
-    printf ("text=\"%s\" preedit=\"%s\"\n", edit->text ().toUtf8 ().constData (),
-            edit->preedit.toUtf8 ().constData ());
+    printf ("text=\"%s\" ", edit->text ().toUtf8 ().constData ());
+    if (edit2) {
+        printf ("text2=\"%s\" ", edit2->text ().toUtf8 ().constData ());
+    }
+    printf ("preedit=\"%s\"\n", (edit2 && edit2->hasFocus () ? edit2 : edit)->preedit.toUtf8 ().constData ());
     fflush (stdout);
 }
 
@@ -93,13 +99,26 @@ int main (int argc, char **argv) {
     qputenv ("QT_QPA_PLATFORM", "wayland");
 
     QApplication app (argc, argv);
-    for (int i = 1; i < argc; i++) {
+    int first = 1;
+    const bool two = argc > 1 && !strcmp (argv[1], "--two");
+    if (two) {
+        first++;
+    }
+    for (int i = first; i < argc; i++) {
         tokens << QString::fromUtf8 (argv[i]);
     }
     dir = QFileInfo (QString::fromUtf8 (argv[0])).absolutePath ();
 
+    QWidget *window = new QWidget ();
+    QVBoxLayout *layout = new QVBoxLayout (window);
     edit = new LineEdit ();
-    edit->show ();
+    layout->addWidget (edit);
+    if (two) {
+        edit2 = new LineEdit ();
+        layout->addWidget (edit2);
+    }
+    layout->addStretch ();
+    window->showMaximized ();
     edit->setFocus ();
 
     // Once the window has the keyboard focus, the line enables text input

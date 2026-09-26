@@ -25,9 +25,10 @@
 # HIME_SESSION_OUTPUTS=2 it has two 1280x800 outputs side by side.
 #
 # With HIME_SESSION_COMPOSITOR=kwin it is a headless KWin (virtual
-# backend, QPainter, no Xwayland), which starts the daemon itself as its
-# input method (--inputmethod), as Plasma does; key injection and
-# screenshots are allowed (KWIN_*_NO_PERMISSION_CHECKS).
+# backend, no Xwayland), which starts the daemon itself as its input method
+# (--inputmethod), as Plasma does; key injection and screenshots are
+# allowed (KWIN_*_NO_PERMISSION_CHECKS).  Screenshots need its OpenGL
+# compositing (a render node or llvmpipe), not QPainter.
 #
 # GTK and Qt applications pick up the HIME IM modules from the build tree.
 # With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
