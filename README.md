@@ -2,6 +2,92 @@
 
 ![badge](https://github.com/hime-ime/hime/workflows/Build/badge.svg)
 
+## 關於這個 fork：Wayland 支援
+
+這是 [hime-ime/hime](https://github.com/hime-ime/hime) 的個人 fork，目標是讓 HIME 在 Wayland 桌面上原生運作，同時保留 HIME 原本的介面與打字手感。改動只放在這個 fork，不會送回原始專案；歡迎有需要的人使用。
+
+### 目前狀態
+
+- 原生 Wayland 的 GTK 3、GTK 4、Qt 5、Qt 6 程式可以透過 HIME 的 IM module 輸入，不需要 `GDK_BACKEND=x11`。
+- 新增 GTK 4 IM module。
+- HIME 主程式與它的視窗目前仍跑在 Xwayland 上。
+- 已在 GNOME 50 與 niri 26.04 上實際使用，並以固定位置的輸入視窗（外觀設定 → 固定輸入視窗位置）為主。
+
+### 安裝
+
+Arch Linux：
+
+```bash
+git clone https://github.com/wade-chiang/hime.git
+cd hime/distro/archlinux
+makepkg -si -p PKGBUILD-wayland
+```
+
+其他發行版，自行編譯：
+
+```bash
+autoreconf -fi
+./configure --prefix=/usr --with-gtk=3.0 --disable-system-tray
+make
+sudo make install
+sudo gtk-query-immodules-3.0 --update-cache
+sudo gio-querymodules /usr/lib/gtk-4.0/4.0.0/immodules
+```
+
+GTK 4 與 Qt 的 module 目錄依發行版而異（例如 Debian 在 `/usr/lib/x86_64-linux-gnu`）；Qt 的位置可以用 `--with-qt5-im-module-path`、`--with-qt6-im-module-path` 指定。
+
+### 設定
+
+建立 `~/.config/environment.d/hime.conf`：
+
+```
+GTK_IM_MODULE=hime
+QT_IM_MODULE=hime
+QT_IM_MODULES=hime
+XMODIFIERS=@im=hime
+```
+
+`environment.d` 只在 systemd 使用者服務啟動時讀取。若登出再登入後沒有生效（例如還有其他登入中的 session），可以直接設定後重新登入：
+
+```bash
+systemctl --user set-environment GTK_IM_MODULE=hime QT_IM_MODULE=hime QT_IM_MODULES=hime XMODIFIERS=@im=hime
+```
+
+HIME 會在第一次打字時自動啟動。
+
+#### GNOME
+
+GNOME 登入時會把 `QT_IM_MODULE`、`QT_IM_MODULES`、`XMODIFIERS` 設成 IBus 的值，所以 Qt 程式可能仍然使用 IBus；GTK 程式不受影響。
+
+#### niri
+
+HIME 的視窗透過 xwayland-satellite 顯示（niri 25.08 起會自動啟動）。在 niri 設定中加入以下規則，避免 HIME 的視窗搶走鍵盤焦點，並固定在左下角：
+
+```kdl
+window-rule {
+  match app-id="(?i)^hime$"
+  open-focused false
+  open-floating true
+  default-floating-position x=50 y=60 relative-to="bottom-left"
+}
+```
+
+### 已知限制
+
+- 在 Wayland 程式中，「跟著游標」的輸入視窗會暫時固定在「固定輸入視窗位置」所設定的座標。
+- 在 niri 等非 GNOME 的合成器上，需要上面的視窗規則；之後會改用 layer-shell 顯示視窗。
+- GTK 4 程式的 AltGr 修飾鍵不會傳給 HIME。
+- Chromium、Electron 程式在原生 Wayland 下尚未測試。
+
+### 開發
+
+```bash
+make check           # 字根表引擎的行為比對測試
+make check-session   # 在 headless mutter 中的端到端測試
+```
+
+開發筆記與 Wayland 計畫見 [CLAUDE.md](CLAUDE.md)。
+
 ## Hime 新手上路
 
 ### 簡介

@@ -1,0 +1,45 @@
+# HIME with native Wayland support, from https://github.com/wade-chiang/hime
+#
+# Build and install:  makepkg -si -p PKGBUILD-wayland
+_pkgname=hime
+pkgname=hime-wayland-git
+pkgver=0
+pkgrel=1
+pkgdesc="HIME input method with native Wayland support (GTK 3/4, Qt 5/6)"
+arch=('x86_64')
+url="https://github.com/wade-chiang/hime"
+license=('LGPL2' 'FDL' 'GPL2')
+depends=('gtk3' 'gtk4' 'libxtst' 'qt5-base' 'qt6-base')
+makedepends=('git' 'gettext')
+optdepends=('xwayland-satellite: run hime on niri and other compositors without Xwayland')
+conflicts=('hime' 'hime-git')
+provides=('hime')
+source=("${_pkgname}::git+https://github.com/wade-chiang/hime.git#branch=master")
+sha512sums=('SKIP')
+
+pkgver() {
+    cd "${srcdir}/${_pkgname}"
+    echo "$(git rev-list --count HEAD).$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd "${srcdir}/${_pkgname}"
+    autoreconf -fi
+    # The daemon is built with GTK 3: GTK 2 has no Wayland backend.  The
+    # legacy GtkStatusIcon tray does not build with GTK 3.
+    ./configure --prefix=/usr --with-gtk=3.0 --disable-system-tray \
+        --with-qt5-im-module-path=/usr/lib/qt/plugins/platforminputcontexts/
+    make
+}
+
+check() {
+    cd "${srcdir}/${_pkgname}"
+    make check
+}
+
+package() {
+    cd "${srcdir}/${_pkgname}"
+    make DESTDIR="${pkgdir}" install
+
+    install -Dm644 fdl-1.2.txt gpl-2.0.txt lgpl-2.1.txt -t "${pkgdir}/usr/share/licenses/${_pkgname}/"
+}
