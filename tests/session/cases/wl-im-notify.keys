@@ -1,0 +1,9 @@
+@program gtk3-text-input-test
+@compositor sway
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# Mouse actions commit text (the symbol table), change the preedit
+# (candidates), and type keys (the virtual keyboard) without key events;
+# the keys typed before stay in the preedit.
+b @hook commit 測試 @check @hook preedit @check
+<space> @check @hook key c @check @hook key space

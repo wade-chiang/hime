@@ -1,0 +1,6 @@
+@program gtk3-text-input-test
+@compositor sway
+# An application with the HIME module next to HIME as the input method: it
+# does not use text-input, so the compositor sends its keys to it, not to
+# the input method, and each key is handled once.
+--im hime b 1 a <space> @check <bs> x

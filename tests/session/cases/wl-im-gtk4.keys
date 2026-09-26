@@ -1,0 +1,5 @@
+@program gtk4-text-input-test
+@compositor sway
+# A GTK 4 application using text-input, as GTK 4 does by default.
+b 1 a <space> c 2 @check
+S-h C-<space> a C-<space> a <space>

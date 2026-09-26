@@ -7,7 +7,9 @@
 #   @program NAME   the client typing the keys (default hime-client-test,
 #                   a client without an X display; gtk3-im-test,
 #                   gtk4-im-test, qt5-im-test and qt6-im-test go through
-#                   the IM modules)
+#                   the IM modules; gtk3-text-input-test and
+#                   gtk4-text-input-test use text-input, with keys typed
+#                   on the seat by wl-type)
 #   @x11            run the client on Xwayland instead of Wayland
 #   @tool NAME      run src/NAME (a hime tool, as a Wayland client) first
 #   @exit N         the client's expected exit status (default 0)

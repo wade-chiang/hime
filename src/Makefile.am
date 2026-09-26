@@ -285,12 +285,35 @@ GTK4_IM_TEST = ../tests/session/gtk4-im-test
 $(GTK4_IM_TEST): ../tests/session/gtk-im-test.c
 	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk4`
 
+# The daemon as a Wayland input method: a GTK entry using text-input, and
+# a virtual keyboard typing into it (tests/session/).
+GTK3_TEXT_INPUT_TEST = ../tests/session/gtk3-text-input-test
+GTK4_TEXT_INPUT_TEST = ../tests/session/gtk4-text-input-test
+WL_TYPE = ../tests/session/wl-type
+
+$(GTK3_TEXT_INPUT_TEST): ../tests/session/text-input-test.c
+	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk+-3.0`
+
+$(GTK4_TEXT_INPUT_TEST): ../tests/session/text-input-test.c
+	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk4`
+
+$(WL_TYPE): ../tests/session/wl-type.c virtual-keyboard-unstable-v1-client-protocol.h \
+		virtual-keyboard-unstable-v1-protocol.c
+	$(CC) -Wall -I. -o $@ $< virtual-keyboard-unstable-v1-protocol.c \
+		`pkg-config --cflags --libs wayland-client xkbcommon`
+
+WL_IM_TESTS =
+if USE_WAYLAND_IM
+WL_IM_TESTS += $(WL_TYPE) $(GTK3_TEXT_INPUT_TEST)
+endif
+
 .PHONY: session-test-programs
-session-test-programs: $(HIME_CLIENT_TEST)
+session-test-programs: $(HIME_CLIENT_TEST) $(WL_IM_TESTS)
 	if [ $(GTK3_IM) = 'Y' ]; then $(MAKE) $(GTK3_IM_TEST); fi
 	if [ $(GTK4_IM) = 'Y' ]; then $(MAKE) $(GTK4_IM_TEST); fi
 	if [ $(QT5_IM) = 'Y' ]; then $(MAKE) -C qt5-im qt-im-test; fi
 	if [ $(QT6_IM) = 'Y' ]; then $(MAKE) -C qt6-im qt-im-test; fi
+	if [ -n "$(WL_IM_TESTS)" ] && pkg-config --exists gtk4; then $(MAKE) $(GTK4_TEXT_INPUT_TEST); fi
 
 hime-tslearn: $(OBJS_TSLEARN) im-client/libhime-im-client.so
 	@echo "linking $@ ..."
@@ -435,7 +458,8 @@ clean:
 	@rm -f *.o *.d *.E *.db *.pico *.so tags $(PROGS) $(PROGS_CV) \
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
 		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
-		$(GTK3_IM_TEST) $(GTK4_IM_TEST) \
+		$(GTK3_IM_TEST) $(GTK4_IM_TEST) $(GTK3_TEXT_INPUT_TEST) \
+		$(GTK4_TEXT_INPUT_TEST) $(WL_TYPE) \
 		*-client-protocol.h *-protocol.c
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;
 
