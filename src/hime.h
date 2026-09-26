@@ -211,6 +211,7 @@ int hime_FocusOut (ClientState *cs);
 void hime_forget_client (ClientState *cs);
 ClientState *hime_focused_client (void);
 gboolean hime_notify_ready (void);
+void hime_init_client_state (ClientState *cs, gboolean new_cli);
 void hime_notify_send (void);
 void force_preedit_shift (void);
 void send_text_call_back (char *text);

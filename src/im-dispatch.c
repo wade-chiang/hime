@@ -326,6 +326,25 @@ static void do_invalid_req (const int fd) {
     shutdown_client (fd);
 }
 
+// Turn the input method on for a new client (new_cli), or, with a single
+// state for all clients, for the first one, as hime-init-im-enabled says.
+// Also used for the Wayland input method's client (wl-im.c).
+void hime_init_client_state (ClientState *cs, gboolean new_cli) {
+    if (!hime_init_im_enabled) {
+        return;
+    }
+    if ((hime_single_state && !is_init_im_enabled) ||
+        (!hime_single_state && new_cli)) {
+
+        dbg ("new_cli default_input_method:%d\n", default_input_method);
+
+        is_init_im_enabled = TRUE;
+        current_CS = cs;
+        save_CS_temp_to_current ();
+        init_state_chinese (cs);
+    }
+}
+
 void process_client_req (const int fd) {
 
     dbg ("svr--> process_client_req %d\n", fd);
@@ -357,19 +376,7 @@ void process_client_req (const int fd) {
         cs->b_hime_protocol = TRUE;
         cs->input_style = InputStyleOverSpot;
 
-        if (hime_init_im_enabled) {
-            if (
-                (hime_single_state && !is_init_im_enabled) ||
-                (!hime_single_state && new_cli)) {
-
-                dbg ("new_cli default_input_method:%d\n", default_input_method);
-
-                is_init_im_enabled = TRUE;
-                current_CS = cs;
-                save_CS_temp_to_current ();
-                init_state_chinese (cs);
-            }
-        }
+        hime_init_client_state (cs, new_cli);
     }
 
     if (!cs) {

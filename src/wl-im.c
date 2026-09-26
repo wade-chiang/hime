@@ -46,6 +46,7 @@
 #include "hime-im-client.h"
 #include "input-method-unstable-v2-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
+#include "win-sym.h"
 #include "wl-im.h"
 
 // from eve.c
@@ -72,10 +73,13 @@ static struct xkb_state *xkb_state;
 // the keymap the virtual keyboard has, as text
 static char *vk_keymap;
 
-// done events received: the serial of commit requests
-static uint32_t serial;
-// state since the last done event, and the state it applied
-static gboolean pending_active, active;
+// done events received, and those applied: commits carry the serial of
+// the state they were made for
+static uint32_t serial, applied_serial;
+// state since the last done event, and the state it applied; activated:
+// an activate came, also while active (a new field, or text input enabled
+// again: the application dropped its preedit)
+static gboolean pending_active, pending_activated, active;
 static uint32_t pending_purpose;
 // the field takes a password: pass all keys on
 static gboolean bypass;
@@ -98,6 +102,9 @@ static int32_t repeat_rate = 25, repeat_delay = 600;
 static guint repeat_source;
 static uint32_t repeat_key;
 
+// the modifiers held, as mirrored to the virtual keyboard
+static uint32_t vk_depressed, vk_latched;
+
 // Events of the grab and the input method, handled in order: showing a
 // window while handling a key can make GDK dispatch the next events (e.g.
 // the key's release) before that is done.
@@ -105,6 +112,7 @@ enum {
     EVENT_KEY,
     EVENT_MODIFIERS,
     EVENT_DONE,
+    EVENT_UNAVAILABLE,
 };
 typedef struct {
     int type;
@@ -197,6 +205,8 @@ static gboolean have_keymap (void) {
 // Send the text HIME committed and the preedit to the application.
 static void flush (void) {
     if (!im || !active) {
+        // nowhere to commit it: do not leave it for a HIME client's reply
+        clear_output_buffer ();
         return;
     }
 
@@ -250,7 +260,7 @@ static void flush (void) {
     if (shown_preedit[0]) {
         zwp_input_method_v2_set_preedit_string (im, shown_preedit, shown_cursor, shown_cursor);
     }
-    zwp_input_method_v2_commit (im, serial);
+    zwp_input_method_v2_commit (im, applied_serial);
 }
 
 gboolean wl_im_ready (void) {
@@ -288,6 +298,10 @@ static gboolean repeat_cb (gpointer data) {
     const gboolean first = GPOINTER_TO_INT (data);
     if (handling) {
         return G_SOURCE_CONTINUE;
+    }
+    if (!active || bypass) {
+        repeat_source = 0;
+        return G_SOURCE_REMOVE;
     }
     handling = TRUE;
     gboolean again = TRUE;
@@ -407,6 +421,9 @@ static const struct zwp_input_method_keyboard_grab_v2_listener grab_listener = {
 // a HIME module: grab only while a text-input field is focused.
 static void start_grab (void) {
     memset (pressed, 0, sizeof (pressed));
+    if (!im) {
+        return;
+    }
     grab = zwp_input_method_v2_grab_keyboard (im);
     zwp_input_method_keyboard_grab_v2_add_listener (grab, &grab_listener, NULL);
 }
@@ -424,11 +441,14 @@ static void stop_grab (void) {
             forward_key (time, key, WL_KEYBOARD_KEY_STATE_RELEASED);
         }
     }
-    if (xkb_state) {
+    // Only if some are held: the focus may have moved on already, and the
+    // new window would see them released
+    if (xkb_state && (vk_depressed || vk_latched)) {
         zwp_virtual_keyboard_v1_modifiers (
             vk, 0, 0,
             xkb_state_serialize_mods (xkb_state, XKB_STATE_MODS_LOCKED),
             xkb_state_serialize_layout (xkb_state, XKB_STATE_LAYOUT_EFFECTIVE));
+        vk_depressed = vk_latched = 0;
     }
 }
 
@@ -438,11 +458,7 @@ static void focus_in (void) {
         wl_cs.b_hime_protocol = TRUE;
         wl_cs.input_style = InputStyleOverSpot;
         wl_cs.use_preedit = TRUE;
-        if (hime_init_im_enabled) {
-            current_CS = &wl_cs;
-            save_CS_temp_to_current ();
-            init_state_chinese (&wl_cs);
-        }
+        hime_init_client_state (&wl_cs, TRUE);
     }
 
     // the application has dropped its preedit
@@ -458,17 +474,29 @@ static void focus_in (void) {
     }
 }
 
+// Text typed but not committed is dropped: the protocol takes no commits
+// after deactivate (the HIME modules commit it on focus out).
 static void focus_out (void) {
+    // a HIME client got the focus in the meantime: it is its engine and
+    // window now
+    if (hime_focused_client () != &wl_cs) {
+        return;
+    }
+    // current_CS may be a HIME tool's connection, or none
+    ClientState *const cs = current_CS;
+    current_CS = &wl_cs;
     hime_reset ();
     clear_output_buffer ();
-    if (current_CS == &wl_cs) {
-        hime_FocusOut (&wl_cs);
-        hide_in_win (&wl_cs);
-    }
+    hime_FocusOut (&wl_cs);
+    // also when hime_FocusOut skips it, as for a quick second focus out
+    hide_in_win (&wl_cs);
+    hide_win_sym ();
+    current_CS = cs ? cs : &wl_cs;
 }
 
 static void im_activate (void *data, struct zwp_input_method_v2 *m) {
     pending_active = TRUE;
+    pending_activated = TRUE;
     // activate resets the state
     pending_purpose = 0;
 }
@@ -491,26 +519,47 @@ static void im_content_type (void *data, struct zwp_input_method_v2 *m,
 
 static void im_done (void *data, struct zwp_input_method_v2 *m) {
     serial++;
-    queue_event (EVENT_DONE, pending_active, pending_purpose, 0, 0);
+    queue_event (EVENT_DONE, pending_active, pending_purpose, pending_activated, serial);
+    pending_activated = FALSE;
 }
 
-static void apply_state (gboolean new_active, uint32_t purpose) {
+static void apply_state (gboolean new_active, uint32_t purpose, gboolean activated,
+                         uint32_t done_serial) {
     const gboolean was_active = active;
     const gboolean was_bypass = bypass;
+    applied_serial = done_serial;
+    if (!im) {
+        return;
+    }
     active = new_active;
     bypass = purpose == CONTENT_PURPOSE_PASSWORD || purpose == CONTENT_PURPOSE_PIN;
 
-    dbg ("wl-im: done %u, active %d, purpose %u\n", serial, active, purpose);
+    dbg ("wl-im: done %u, active %d, purpose %u\n", done_serial, active, purpose);
 
+    if (active != was_active || bypass != was_bypass || activated) {
+        stop_repeat ();
+    }
     if (active && !was_active) {
         start_grab ();
         focus_in ();
     } else if (!active && was_active) {
         stop_grab ();
         focus_out ();
-    } else if (active && bypass != was_bypass) {
+    } else if (active && (bypass != was_bypass || activated)) {
         focus_in ();
     }
+}
+
+// another input method has the seat
+static void become_unavailable (void) {
+    fprintf (stderr, "hime: another Wayland input method is running\n");
+    if (active) {
+        stop_grab ();
+        focus_out ();
+        active = FALSE;
+    }
+    zwp_input_method_v2_destroy (im);
+    im = NULL;
 }
 
 static void handle_events (void) {
@@ -523,7 +572,8 @@ static void handle_events (void) {
         const uint32_t *arg = event->arg;
         switch (event->type) {
         case EVENT_KEY:
-            if (!have_keymap ()) {
+            // keys queued before the grab was released
+            if (!active || !have_keymap ()) {
                 break;
             }
             if (arg[2] == WL_KEYBOARD_KEY_STATE_PRESSED) {
@@ -538,9 +588,16 @@ static void handle_events (void) {
             }
             xkb_state_update_mask (xkb_state, arg[0], arg[1], arg[2], 0, 0, arg[3]);
             zwp_virtual_keyboard_v1_modifiers (vk, arg[0], arg[1], arg[2], arg[3]);
+            vk_depressed = arg[0];
+            vk_latched = arg[1];
             break;
         case EVENT_DONE:
-            apply_state (arg[0], arg[1]);
+            apply_state (arg[0], arg[1], arg[2], arg[3]);
+            break;
+        case EVENT_UNAVAILABLE:
+            if (im) {
+                become_unavailable ();
+            }
             break;
         }
         g_free (event);
@@ -549,10 +606,7 @@ static void handle_events (void) {
 }
 
 static void im_unavailable (void *data, struct zwp_input_method_v2 *m) {
-    fprintf (stderr, "hime: another Wayland input method is running\n");
-    zwp_input_method_v2_destroy (im);
-    im = NULL;
-    active = FALSE;
+    queue_event (EVENT_UNAVAILABLE, 0, 0, 0, 0);
 }
 
 static const struct zwp_input_method_v2_listener im_listener = {
