@@ -97,16 +97,29 @@ void move_win_pho (int x, int y) {
     move_win_sym ();
 }
 
-void create_win_pho () {
+// The Zhuyin window: the input window of the Zhuyin method, or, for the
+// same pronunciation query of gtab (INPUT_WINDOW false), a window below
+// gtab's at a position of its own (not a popup, which would overlap it; in
+// KWin replace it).
+static void create_win_pho_window (gboolean input_window) {
     if (win_pho)
         return;
 
-    win_pho = hime_input_window_new ();
+    if (input_window) {
+        win_pho = hime_input_window_new ();
+    } else {
+        win_pho = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+        hime_window_init (win_pho, TRUE);
+    }
     gtk_window_set_has_resize_grip (GTK_WINDOW (win_pho), FALSE);
     gtk_container_set_border_width (GTK_CONTAINER (win_pho), 0);
     gtk_widget_realize (win_pho);
     set_no_focus (win_pho);
     apply_widget_bg_color (win_pho);
+}
+
+void create_win_pho () {
+    create_win_pho_window (TRUE);
 }
 
 static void mouse_button_callback (GtkWidget *widget, GdkEventButton *event, gpointer data) {
@@ -272,6 +285,15 @@ void move_gtab_pho_query_win () {
 }
 
 void init_gtab_pho_query_win () {
+    // The window exists only once the Zhuyin method was used: create it
+    // (without it, the query showed nothing)
+    if (hime_window_is_popup (win_pho)) {
+        destroy_win_pho ();
+    }
+    if (!win_pho) {
+        create_win_pho_window (FALSE);
+        create_win_pho_gui ();
+    }
     init_tab_pho ();
     move_gtab_pho_query_win ();
 }

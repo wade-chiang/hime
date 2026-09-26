@@ -189,6 +189,7 @@ void hime_window_move (GtkWidget *win, int x, int y);
 void hime_window_get_position (GtkWidget *win, int *x, int *y);
 GtkWidget *hime_input_window_new (void);
 gboolean hime_input_window_stale (GtkWidget *win);
+gboolean hime_window_is_popup (GtkWidget *win);
 GdkDisplay *get_default_display (void);
 #if GTK_CHECK_VERSION(3, 0, 0)
 GdkMonitor *get_primary_monitor (void);

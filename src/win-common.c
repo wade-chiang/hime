@@ -75,6 +75,10 @@ static gboolean is_popup (GtkWidget *win) {
     return g_object_get_data (G_OBJECT (win), "hime-popup") != NULL;
 }
 
+gboolean hime_window_is_popup (GtkWidget *win) {
+    return win && is_popup (win);
+}
+
 // A new window for the main input windows (the ones following the text
 // cursor in OverSpot): an input popup surface while a Wayland text-input
 // field is focused, placed by the compositor; otherwise as with
