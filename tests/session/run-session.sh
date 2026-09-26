@@ -13,7 +13,8 @@
 #
 # The daemon's config can be adjusted with HIME_CONF="name=value ...", and
 # HIME_SESSION_METHOD=intcode, chewing or anthy makes that module (from the
-# build tree) the default input method.
+# build tree) the default input method, and pho or tsin the Zhuyin or
+# phrase (詞音) method.
 #
 # With HIME_SESSION_DAEMON_BACKEND=wayland the daemon is forced onto GDK's Wayland
 # backend with no X display at all.
@@ -59,9 +60,11 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     intcode) module="0 intcode-module.so" ;;
     chewing) module="[ chewing-module.so" ;;
     anthy) module="= anthy-module.so" ;;
+    pho) module="3 !PHO" ;;
+    tsin) module="6 !TSIN" ;;
     *) module="" ;;
     esac
-    if [[ -n "$module" && ! -f "$top/src/modules/${module#* }" ]]; then
+    if [[ -n "$module" && "$module" != *'!'* && ! -f "$top/src/modules/${module#* }" ]]; then
         echo "run-session.sh: ${module#* } not built" >&2
         exit 77
     fi

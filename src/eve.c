@@ -421,37 +421,62 @@ void show_input_method_name_on_gtab ();
 extern GtkWidget *win_gtab, *win_pho;
 void move_in_win (ClientState *cs, int x, int y);
 
-// Create the input window of the current input method again if it is the
-// wrong kind now (hime_input_window_stale ()), e.g. after the input style
-// changed.  Module windows stay as they are.
-void refresh_input_window (void) {
+// Create the input window of the focused client's input method again if
+// it is the wrong kind now (hime_input_window_stale ()): the focus moved
+// between a text-input field and a HIME client, the input style changed,
+// or the method did.  Module windows stay as they are.  With SHOW, show
+// it also when it was not created again (other settings may have created
+// it again, hidden).
+void refresh_input_window (gboolean show) {
+    // not a tool's connection (hime-setup's message asking to reload)
+    ClientState *const cs = current_CS;
+    if (hime_focused_client ()) {
+        current_CS = hime_focused_client ();
+    }
+    if (!current_CS) {
+        return;
+    }
+
+    GtkWidget *win;
+    void (*destroy) (void), (*init) (void);
     switch (current_method_type ()) {
     case method_type_PHO:
-        if (!hime_input_window_stale (win_pho)) {
-            return;
-        }
-        destroy_win_pho ();
-        init_win_pho ();
+        win = win_pho;
+        destroy = destroy_win_pho;
+        init = init_win_pho;
         break;
     case method_type_TSIN:
-        if (!hime_input_window_stale (win0)) {
-            return;
-        }
-        destroy_win0 ();
-        init_win0 ();
+        win = win0;
+        destroy = destroy_win0;
+        init = init_win0;
         break;
     case method_type_MODULE:
-        return;
+        win = NULL;
+        break;
     default:
-        if (!hime_input_window_stale (win_gtab)) {
-            return;
-        }
-        destroy_win_gtab ();
-        init_win_gtab ();
+        win = win_gtab;
+        destroy = destroy_win_gtab;
+        init = init_win_gtab;
     }
-    // A layer surface is placed at the fixed position (the only one known
-    // on Wayland); the compositor places a popup
-    move_in_win (current_CS, hime_root_x, hime_root_y);
+
+    if (hime_input_window_stale (win)) {
+        destroy ();
+        init ();
+        // What it showed went with it: drop that, which also draws the
+        // new window afresh
+        hime_reset ();
+        // A layer surface is placed at the fixed position (the only one
+        // known on Wayland); the compositor places a popup
+        move_in_win (current_CS, hime_root_x, hime_root_y);
+        show = TRUE;
+    }
+    // Show it as on focus in (it may be hidden now for another reason,
+    // e.g. a tool connecting); with hime-pop-up-win, only with input
+    INMD *input_method = current_input_method ();
+    if (show && current_CS->b_im_enabled && input_method->win_funcs.show_input_window) {
+        input_method->win_funcs.show_input_window ();
+    }
+    current_CS = cs;
 }
 
 void show_in_win (ClientState *cs) {
@@ -459,7 +484,7 @@ void show_in_win (ClientState *cs) {
         return;
     }
 
-    refresh_input_window ();
+    refresh_input_window (FALSE);
 
     INMD *input_method = current_input_method ();
     if ((input_method->win_funcs).show_input_window)
@@ -988,6 +1013,8 @@ gboolean init_in_method (int in_no) {
         //    dbg("aa selkey %s\n", inmd[current_CS->in_method].selkey);
     }
 
+    // its window may have been made for another client or input style
+    refresh_input_window (FALSE);
     update_in_win_pos ();
     update_win_kbm_inited ();
 

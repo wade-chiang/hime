@@ -134,9 +134,17 @@ keeping HIME's own UI and typing feel. Phases:
    plugs into `hime_notify_ready/send` for mouse actions. All text-input
    applications share one static ClientState. Session tests type real
    keys with `tests/session/wl-type` into `*-text-input-test` in headless
-   sway. 3b (next): OverSpot as `zwp_input_popup_surface_v2`; a GTK
-   window can only get that role if gtk-layer-shell never touched it, so
-   switching styles means recreating the input windows.
+   sway. 3b done: in OverSpot with a text-input field focused, win_gtab,
+   win0 and win_pho are input popups (`hime_input_window_new ()`,
+   `HimePopupWindow` in `src/wl-im.c`). A GTK window cannot drop
+   gtk-layer-shell, so `refresh_input_window ()` in `src/eve.c` creates
+   the focused client's window again when its kind no longer fits (on
+   show_in_win, init_in_method, and the `change font size` reload that
+   hime-setup sends). win1, the symbol table, the gtab same-pho window
+   and module windows stay at the fixed position; win1 is placed relative
+   to the fixed position when win0 is a popup. Session tests take
+   screenshots through `@exec popup-shot.sh` and switch styles with
+   `set-style.sh`; `@method pho|tsin` exercises those windows.
 4. `zwp_input_method_v1` frontend (KDE/KWin).
 5. IBus-compatible frontend plus a GNOME Shell extension (GNOME/Mutter).
 
@@ -204,6 +212,16 @@ Known gaps after phase 1 (from review, not fixed yet):
   itself (`wayland-N`, ignoring `WAYLAND_DISPLAY`), its IPC socket path
   must fit in `sun_path` (keep `XDG_RUNTIME_DIR` short, e.g. mktemp), and
   there is no swaybg, so layer checks compare against a far-away pixel.
+- A popup surface's wl_surface must not be destroyed before its role:
+  GtkWindow's unmap destroys it, and gtk-layer-shell overrides that class
+  handler for every window, so signal handlers and emission hooks run too
+  late; `HimePopupWindow` drops the role in its unmap vfunc.
+- A HIME tool's connection (hime-setup, hime-message) is current_CS while
+  it is set up and switches the input method for its own new state; the
+  focused client's window can end up hidden or recreated, so anything
+  acting on "the" input window should use `hime_focused_client ()`.
+- `change_win0_style ()` recreates win0 on the first settings reload
+  (its `current_hime_inner_frame` starts at 0).
 - GDK dispatches Wayland events re-entrantly while a window is shown
   (e.g. HIME's window popping up on a key press): `src/wl-im.c` queues
   grab and input method events and handles them one at a time.

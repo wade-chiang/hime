@@ -47,6 +47,9 @@ void destroy_win_pho () {
         return;
     gtk_widget_destroy (win_pho);
     win_pho = NULL;
+    // gone with it: create_win_pho_gui () makes them again
+    top_bin = hbox_row2 = NULL;
+    label_pho_sele = label_pho = label_full = label_key_codes = NULL;
 }
 
 gboolean is_win_pho_visible () {

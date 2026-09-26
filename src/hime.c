@@ -385,7 +385,7 @@ static void change_font_size () {
     //  change_win_pho_style();
     change_module_font_size ();
     // the input style may have changed (hime-setup sends this for it)
-    refresh_input_window ();
+    refresh_input_window (TRUE);
 }
 
 static int xerror_handler (Display *d, XErrorEvent *eve) {

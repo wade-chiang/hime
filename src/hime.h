@@ -225,7 +225,7 @@ int current_fullwidth_mode (void);
 void clear_output_buffer (void);
 void flush_edit_buffer (void);
 void hide_in_win (ClientState *cs);
-void refresh_input_window (void);
+void refresh_input_window (gboolean show);
 void hime_reset (void);
 void init_state_chinese (ClientState *cs);
 void save_CS_temp_to_current (void);
