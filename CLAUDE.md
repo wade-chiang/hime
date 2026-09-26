@@ -94,14 +94,21 @@ the input but leaves the candidate row shown.
 The goal is native Wayland support on all mainstream compositors while
 keeping HIME's own UI and typing feel. Phases:
 
-1. Daemon and IM modules work without X11: socket path under
+1. Done: daemon and IM modules work without X11: socket path under
    `$XDG_RUNTIME_DIR`, keysym-based key events, a GTK 4 IM module.
-2. Separate the candidate UI model from its windows; draw with cairo so
-   the same code renders into X11 windows and Wayland surfaces. The
-   harness's stub list is the seam: everything `harness.c` replaces from
-   `win-gtab.c` is the UI interface to extract.
+2. Mostly done: where the compositor supports wlr-layer-shell, the daemon
+   runs on GDK's Wayland backend (`choose_backend ()` in `src/hime.c`,
+   overridable with `HIME_BACKEND=x11|wayland`) and its windows are
+   layer surfaces (`hime_window_init/move/get_position` in
+   `src/win-common.c`, anchored top-left, placed by margins). Left: an
+   unsolicited daemon-to-client message so mouse-driven commits (win1
+   candidates, symbol table, virtual keyboard; today XTest, which never
+   reaches Wayland clients) work; module windows (anthy, chewing,
+   intcode) and the input method menu.
 3. `zwp_input_method_v2` + popup surface frontend (niri, sway, Hyprland,
-   labwc/Xfce).
+   labwc/Xfce), for OverSpot. Drawing into a popup surface may need the
+   candidate UI separated from its GTK windows; the harness's stub list
+   (everything `harness.c` replaces from `win-gtab.c`) is that seam.
 4. `zwp_input_method_v1` frontend (KDE/KWin).
 5. IBus-compatible frontend plus a GNOME Shell extension (GNOME/Mutter).
 
@@ -154,11 +161,24 @@ Known gaps after phase 1 (from review, not fixed yet):
   user manager; Qt 6 prefers it over `QT_IM_MODULE`, and it survives into
   other sessions (niri) while the user manager lives. Users need
   `QT_IM_MODULES=hime` too.
-- Until the daemon draws through layer-shell, niri shows its X11 windows
-  (app-id `Hime`) through xwayland-satellite as ordinary windows that take
-  the focus. A niri window rule works around it:
-  `match app-id="(?i)^hime$"`, `open-focused false`, `open-floating true`,
-  `default-floating-position ... relative-to="bottom-left"`.
+- A daemon on X11 under niri (`HIME_BACKEND=x11`, or a build without
+  gtk-layer-shell) shows its windows through xwayland-satellite as
+  ordinary windows (app-id `Hime`) that take the focus; a niri window rule
+  works around it: `match app-id="(?i)^hime$"`, `open-focused false`,
+  `open-floating true`, `default-floating-position ...`.
+- gtk-layer-shell must init a window before it is realized and cannot
+  undo it: call `hime_window_init ()` right after `gtk_window_new ()`.
+  Layer surfaces report no position; `hime_window_get_position ()`
+  returns what `hime_window_move ()` set.
+- Headless sway for tests (`@compositor sway`): it names its socket
+  itself (`wayland-N`, ignoring `WAYLAND_DISPLAY`), its IPC socket path
+  must fit in `sun_path` (keep `XDG_RUNTIME_DIR` short, e.g. mktemp), and
+  there is no swaybg, so layer checks compare against a far-away pixel.
+- On niri, `niri msg -j layers` shows the daemon's surfaces (namespace
+  `hime`, Overlay, keyboard interactivity None). A test daemon can run in
+  the user's live session without touching theirs: private
+  `XDG_RUNTIME_DIR` and `HOME`, and `WAYLAND_DISPLAY` set to the absolute
+  path of the session's socket.
 - `~/.config/environment.d` is only read when the systemd user manager
   starts, which may outlive GNOME logins (e.g. a tmux/ssh session).
 - Test in the user's real GNOME session from a shell by taking

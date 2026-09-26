@@ -10,12 +10,14 @@
 
 - GTK 與 Qt 的 IM module 不再依賴 X11，原生 Wayland 程式可以透過 HIME 輸入，不需要 `GDK_BACKEND=x11`。
 - 新增 GTK 4 IM module。
-- HIME 主程式與它的視窗目前仍跑在 Xwayland 上。
+- 在支援 layer-shell 的合成器上（niri、sway、Hyprland、KDE 等），HIME 主程式直接跑在 Wayland 上，視窗以 layer-shell 顯示：固定在設定的位置、不會搶走鍵盤焦點，不需要 Xwayland。
+- 在 GNOME 等沒有 layer-shell 的桌面上，HIME 主程式與它的視窗跑在 Xwayland 上。
+- 啟動時自動選擇；可用 `HIME_BACKEND=x11` 或 `HIME_BACKEND=wayland` 強制指定。
 - 以固定位置的輸入視窗（外觀設定 → 固定輸入視窗位置）為主。
 
 驗證範圍：
 
-- 自動測試：`make check-session`，在 headless mutter 中以模擬按鍵輸入。
+- 自動測試：`make check-session`，在 headless mutter 或 sway 中以模擬按鍵輸入；sway 中另以截圖檢查 layer-shell 視窗的位置。
 - 真實桌面測試程式：同樣的測試程式，在實際登入的桌面中，以已安裝的套件與嘸蝦米字根表輸入。
 - 實際使用：在真實程式中手動打字。
 
@@ -40,6 +42,7 @@ makepkg -si -p PKGBUILD-wayland
 
 ```bash
 autoreconf -fi
+# 需要 gtk-layer-shell 才能在 niri 等合成器上以 layer-shell 顯示視窗
 ./configure --prefix=/usr --with-gtk=3.0 --disable-system-tray
 make
 sudo make install
@@ -72,23 +75,16 @@ HIME 會在第一次打字時自動啟動。
 
 GNOME 登入時會把 `QT_IM_MODULE`、`QT_IM_MODULES`、`XMODIFIERS` 設成 IBus 的值，所以 Qt 程式可能仍然使用 IBus；GTK 程式不受影響。
 
-#### niri
+#### niri 及其他支援 layer-shell 的合成器
 
-HIME 的視窗透過 xwayland-satellite 顯示（niri 25.08 起會自動啟動）。在 niri 設定中加入以下規則，避免 HIME 的視窗搶走鍵盤焦點，並固定在左下角：
-
-```kdl
-window-rule {
-  match app-id="(?i)^hime$"
-  open-focused false
-  open-floating true
-  default-floating-position x=50 y=60 relative-to="bottom-left"
-}
-```
+不需要額外設定。HIME 會自動改用 Wayland 與 layer-shell，niri 也不需要 xwayland-satellite 或視窗規則；舊版說明中的 `app-id="(?i)^hime$"` 視窗規則可以移除。
 
 ### 已知限制
 
 - 在 Wayland 程式中，「跟著游標」的輸入視窗會暫時固定在「固定輸入視窗位置」所設定的座標。
-- 在 niri 等非 GNOME 的合成器上，需要上面的視窗規則；之後會改用 layer-shell 顯示視窗。
+- 用滑鼠點選候選字、符號表或虛擬鍵盤送出的文字，還無法送到原生 Wayland 程式。
+- Anthy、新酷音、內碼等外掛模組的視窗，以及輸入法選單，在 layer-shell 上尚未處理。
+- HIME 跑在 Wayland 上時不提供 XIM，沒有 GTK/Qt IM module 的純 X11 程式無法使用 HIME。
 - GTK 4 程式的 AltGr 修飾鍵不會傳給 HIME。
 - Chromium、Electron 程式在原生 Wayland 下尚未測試。
 
