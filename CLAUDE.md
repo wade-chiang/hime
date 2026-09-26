@@ -43,6 +43,10 @@ make check-session        # end-to-end tests in a headless mutter session
   the repo; put it and cases using it in the git-ignored `tests/gtab/local/`
   and run `tests/gtab/run-tests.sh tests/gtab/local/*.keys`.
 
+Session tests drive mouse actions through test hooks
+(`HIME_TEST_HOOKS`, `hime_test_hook ()` in `src/eve.c`, used by
+`tests/session/notify-check.sh`).
+
 `tests/session/` runs the real daemon on the Xwayland of a private
 headless mutter (`run-session.sh`, needs mutter and dbus-run-session) and
 types through `libhime-im-client` from a client with no X display, as a
@@ -100,10 +104,14 @@ keeping HIME's own UI and typing feel. Phases:
    runs on GDK's Wayland backend (`choose_backend ()` in `src/hime.c`,
    overridable with `HIME_BACKEND=x11|wayland`) and its windows are
    layer surfaces (`hime_window_init/move/get_position` in
-   `src/win-common.c`, anchored top-left, placed by margins). Left: an
-   unsolicited daemon-to-client message so mouse-driven commits (win1
-   candidates, symbol table, virtual keyboard; today XTest, which never
-   reaches Wayland clients) work; the input method menu. Modules get the
+   `src/win-common.c`, anchored top-left, placed by margins). Mouse
+   actions (candidate clicks, symbol table, virtual keyboard) reach
+   clients as notifications: unsolicited `HIME_NOTIFY_MAGIC` messages on
+   UNIX connections of clients that asked for them (see
+   `hime-protocol.h`, `hime_notify_send ()` in `src/im-dispatch.c`, the
+   modules' fd watches); XTest remains for XIM and old clients. Left: the
+   input method menu; virtual keyboard modifiers and keys the engine does
+   not take on Wayland. Modules get the
    window helpers through `HIME_module_main_functions` (modules must use
    it: the daemon exports no symbols). Session tests cover the intcode,
    chewing and anthy modules (`@method`). The intcode module logs two
