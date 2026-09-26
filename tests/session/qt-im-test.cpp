@@ -25,11 +25,15 @@
  * Usage: qt{5,6}-im-test KEY...
  *   KEY is a single printable character or one of <space> <enter> <bs>
  *   <esc>, optionally prefixed by S- (Shift) and/or C- (Control).
+ *   @wait MS processes events for MS, then prints what the input context
+ *   committed meanwhile (notifications).
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include <QtCore/QElapsedTimer>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QInputMethodEvent>
 #include <QtGui/QKeyEvent>
@@ -140,6 +144,17 @@ int main (int argc, char **argv) {
     context->setFocusObject (&window);
 
     for (int i = 1; i < argc; i++) {
+        if (!strcmp (argv[i], "@wait") && i + 1 < argc) {
+            window.commits.clear ();
+            QElapsedTimer timer;
+            timer.start ();
+            const int ms = atoi (argv[++i]);
+            while (timer.elapsed () < ms)
+                app.processEvents (QEventLoop::AllEvents, 10);
+            printf ("@wait    commit=\"%s\"\n", window.commits.toUtf8 ().constData ());
+            continue;
+        }
+
         Key key;
         if (!parse_key (argv[i], &key)) {
             fprintf (stderr, "bad key: %s\n", argv[i]);

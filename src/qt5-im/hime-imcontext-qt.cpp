@@ -9,6 +9,7 @@
 #include <QtGui/QPalette>
 #include <QtGui/QTextCharFormat>
 #include <QtGui/QWindow>
+#include <QtCore/QSocketNotifier>
 
 // confliction of qt & x11
 typedef unsigned long KeySym;
@@ -67,7 +68,47 @@ QHimePlatformInputContext::QHimePlatformInputContext () {
         return;
     }
 
+    hime_im_client_enable_notify (hime_ch);
+    watch_notifications ();
+
     dbg ("QHimePlatformInputContext succ\n");
+}
+
+// Notifications: text the daemon commits without a key event (mouse clicks
+// on candidates, the symbol table), and preedit changes.
+
+// Watch the daemon connection, following reconnections.
+void QHimePlatformInputContext::watch_notifications () {
+    const int fd = hime_im_client_get_fd (hime_ch);
+    if (notifier && fd == notifier_fd) {
+        return;
+    }
+
+    if (notifier) {
+        // may run inside the notifier's own signal
+        notifier->deleteLater ();
+        notifier = nullptr;
+    }
+
+    if (fd > 0 && hime_ch->notify_ok) {
+        notifier = new QSocketNotifier (fd, QSocketNotifier::Read, this);
+        notifier_fd = fd;
+        QObject::connect (notifier, &QSocketNotifier::activated, this,
+                          [this] () { handle_notifications (); });
+    }
+}
+
+// Hand out the notifications received, whether through the watch or while
+// waiting for another reply.
+void QHimePlatformInputContext::handle_notifications () {
+    char *commit = NULL;
+    if (hime_ch && hime_im_client_read_notify (hime_ch, &commit)) {
+        if (commit) {
+            send_str (commit);  // frees it
+        }
+        update_preedit ();
+    }
+    watch_notifications ();
 }
 
 QHimePlatformInputContext::~QHimePlatformInputContext () {
@@ -310,6 +351,7 @@ bool QHimePlatformInputContext::filterEvent (const QEvent *event) {
     if (event->type () == QEvent::KeyPress) {
         if (send_key_press (keysym, state)) {
             update_preedit ();
+            handle_notifications ();
             return true;
         }
     } else {
@@ -320,10 +362,12 @@ bool QHimePlatformInputContext::filterEvent (const QEvent *event) {
         }
 
         if (result) {
+            handle_notifications ();
             return true;
         }
     }
 
 ret:
+    handle_notifications ();
     return QPlatformInputContext::filterEvent (event);
 }

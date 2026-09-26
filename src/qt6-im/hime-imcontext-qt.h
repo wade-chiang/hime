@@ -21,6 +21,7 @@
 #include <QtGui/qpa/qplatforminputcontext.h>
 
 class QInputMethodEvent;
+class QSocketNotifier;
 struct HIME_client_handle_S;
 
 class QHimePlatformInputContext : public QPlatformInputContext {
@@ -38,7 +39,12 @@ class QHimePlatformInputContext : public QPlatformInputContext {
     virtual void setFocusObject (QObject *object);
 
   private:
-    HIME_client_handle_S *hime_ch;
+    HIME_client_handle_S *hime_ch = nullptr;
+    // watch on the daemon connection for notifications
+    QSocketNotifier *notifier = nullptr;
+    int notifier_fd = 0;
+    void watch_notifications ();
+    void handle_notifications ();
     void send_event (QInputMethodEvent &e);
     void update_preedit ();
     void cursorMoved ();

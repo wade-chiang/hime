@@ -1,0 +1,5 @@
+b        eat 
+@wait    commit="測試"
+module=QHimePlatformInputContext
+platform=wayland
+focus=yes

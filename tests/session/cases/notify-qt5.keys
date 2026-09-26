@@ -1,0 +1,5 @@
+@program notify-check.sh
+@x11
+# A Qt 5 application gets text committed without a key event (symbol
+# table, candidate clicks) through the input context's notification watch.
+qt5-im-test b
