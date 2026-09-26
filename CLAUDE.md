@@ -141,5 +141,20 @@ Known gaps after phase 1 (from review, not fixed yet):
   the daemon runs helper tools from the hard-coded `HIME_BIN_DIR`.
 - `src/im-client/` compiles its own copies of `src/*.c` files; the src
   Makefile always recurses into it so they get rebuilt.
+- Packages are linked with `-z now` (Arch makepkg default): every
+  undefined symbol of a module and of `libhime-im-client` must resolve
+  in the host application. The library is loaded into GTK 4 and Qt apps,
+  so it must not use GTK 3; session tests run with `LD_BIND_NOW=1` to
+  catch this. Check with `ldd -r` on the modules.
+- The daemon must daemonize before `gtk_init()`: forking after GLib
+  started its GDBus worker threads hangs the child.
+- GNOME sets `XMODIFIERS=@im=ibus` and `QT_IM_MODULE=ibus` in the
+  session; HIME only takes an `@im=` name starting with `hime`.
+- `~/.config/environment.d` is only read when the systemd user manager
+  starts, which may outlive GNOME logins (e.g. a tmux/ssh session).
+- Test in the user's real GNOME session from a shell by taking
+  `WAYLAND_DISPLAY`, `DISPLAY`, `DBUS_SESSION_BUS_ADDRESS` from a GUI
+  process's `/proc/<pid>/environ`, and `GTK_PATH` / `LD_LIBRARY_PATH`
+  pointing at the build tree.
 - The daemon reads config from `$HOME/.config/hime`; tests isolate it by
   pointing `HOME` at a temp dir and `HIME_TABLE_DIR` at `data/`.
