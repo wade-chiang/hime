@@ -113,6 +113,11 @@ export WAYLAND_DISPLAY=wl-hime-test
 export LD_LIBRARY_PATH="$top/src/im-client${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export HIME_IM_CLIENT_NO_AUTO_EXEC=1
 
+# Resolve all symbols at load time, as binaries linked with -z now (the
+# default of Arch makepkg) do: a module with a missing symbol must fail
+# here, not only in the packaged build.
+export LD_BIND_NOW=1
+
 export GTK_IM_MODULE=hime
 if [[ -f "$top/src/gtk3-im/im-hime.so" ]]; then
     gtk-query-immodules-3.0 "$top/src/gtk3-im/im-hime.so" >"$tmp/immodules.cache"

@@ -12,6 +12,10 @@ CFLAGS+= $(OPTFLAGS) $(GTKINC) \
 		-I. -I.. -I../IMdkit/include \
 		-fPIC
 
+# The library is loaded into GTK 2/3/4 and Qt applications: link what it
+# uses itself, and nothing from GTK.
+CLIENT_LIBS = -lX11 $(shell pkg-config --libs glib-2.0)
+
 DEPS = hime-common.o hime-conf.o hime-crypt.o hime-settings.o \
 		locale.o im-addr.o pho2pinyin.o pinyin.o util.o
 OBJS = hime-im-client.o hime-send.o $(DEPS)
@@ -34,9 +38,9 @@ $(SOFILEVER):   $(OBJS)
 	@echo "linking $@ ..."
 
 if FREEBSD
-	$(CC) $(SO_FLAGS) -Wl,-soname,libhime-im-client.so.1 $(OBJS) $(LDFLAGS+) -o $@ -L/usr/X11R6/lib
+	$(CC) $(SO_FLAGS) -Wl,-soname,libhime-im-client.so.1 $(OBJS) $(CLIENT_LIBS) -o $@ -L/usr/X11R6/lib
 else
-	$(CC) $(SO_FLAGS) -Wl,-soname,libhime-im-client.so.1 $(OBJS) $(LDFLAGS+) -o $@ -L/usr/local/lib
+	$(CC) $(SO_FLAGS) -Wl,-soname,libhime-im-client.so.1 $(OBJS) $(CLIENT_LIBS) -o $@ -L/usr/local/lib
 endif
 	ln -sf $(SOFILEVER) $(SOFILE)
 	ln -sf $(SOFILEVER) $(SOFILE).1

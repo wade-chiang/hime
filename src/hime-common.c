@@ -21,6 +21,11 @@
 
 #include "pho.h"
 
+// libhime-im-client (CLIENT_LIB) only needs get_atom_by_name: it is
+// loaded into GTK 4 and Qt applications, where the GTK 3 widget code below
+// cannot be resolved.
+#if !CLIENT_LIB
+
 gboolean b_use_full_space = TRUE;
 
 static char text_pho[6][CH_SZ];
@@ -182,6 +187,8 @@ GdkKeymap *get_keymap (void) {
 gboolean get_caps_lock_state (void) {
     return gdk_keymap_get_caps_lock_state (get_keymap ());
 }
+
+#endif  // !CLIENT_LIB
 
 Atom get_atom_by_name (Display *display, const char *name) {
     if (!display) {
