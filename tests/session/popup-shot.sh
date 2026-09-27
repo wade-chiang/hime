@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Run by text-input-test (@exec) in a headless sway or KWin session: screenshot
+# Run by text-input-test (@exec) in a headless sway, KWin or GNOME session: screenshot
 # the screen and report which of the POINTS show hime's window (anything
 # but the color at HIME_CHECK_BACKGROUND, a point of the test window far
 # from it).  The first point must be one where the window is expected: the
@@ -17,11 +17,14 @@ here="$(cd "$(dirname "$0")" && pwd)"
 screenshot() {
     if [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]]; then
         "$here/kwin-shot.py" "$1"
+    elif [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
+        "$here/gnome-shot.py" "$1"
     else
         grim -t ppm "$1"
     fi
 }
-if [[ "${HIME_SESSION_COMPOSITOR:-}" != kwin ]] && ! command -v grim >/dev/null; then
+if [[ "${HIME_SESSION_COMPOSITOR:-}" != kwin && "${HIME_SESSION_COMPOSITOR:-}" != gnome ]] &&
+    ! command -v grim >/dev/null; then
     echo "popup-shot.sh: grim not found" >&2
     exit 77
 fi
