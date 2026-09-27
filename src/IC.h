@@ -60,6 +60,7 @@ typedef struct {
     gboolean b_raise_window;
     gboolean in_method_switched;  ///< TRUE: switch input method at least once    FALSE: never switch input method
     gboolean use_preedit;
+    gboolean screen_spot;  ///< spot_location is in screen coordinates
     gboolean b_chinese_mode;  ///< TRUE: Chinese/Other language mode    FALSE: English mode
     short fixed_x, fixed_y;
     short in_method;

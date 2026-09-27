@@ -196,7 +196,9 @@ static void watch_notifications (HimeEngine *engine) {
     if (fd > 0 && fd != engine->flags_fd) {
         engine->flags_fd = fd;
         int ret = 0;
-        hime_im_client_set_flags (engine->hime_ch, FLAG_HIME_client_handle_use_preedit, &ret);
+        hime_im_client_set_flags (engine->hime_ch,
+                                  FLAG_HIME_client_handle_use_preedit | FLAG_HIME_client_handle_screen_spot,
+                                  &ret);
         hime_im_client_enable_notify (engine->hime_ch);
         DBG ("connected on fd %d, notify_ok %d\n", fd, hime_im_client_notify_ok (engine->hime_ch));
     }
@@ -301,6 +303,18 @@ static void hime_engine_focus_out (IBusEngine *ibus_engine) {
     after_request (engine);
 }
 
+// Where the text cursor is, in screen coordinates (GNOME's stage): HIME's
+// window goes below it in OverSpot
+static void hime_engine_set_cursor_location (IBusEngine *ibus_engine, gint x, gint y, gint w, gint h) {
+    HimeEngine *engine = (HimeEngine *) ibus_engine;
+    DBG ("cursor %d,%d %dx%d\n", x, y, w, h);
+    if (!engine->hime_ch || engine->bypass) {
+        return;
+    }
+    hime_im_client_set_cursor_location (engine->hime_ch, x, y + h);
+    after_request (engine);
+}
+
 static void hime_engine_reset (IBusEngine *ibus_engine) {
     HimeEngine *engine = (HimeEngine *) ibus_engine;
     if (engine->hime_ch) {
@@ -363,6 +377,7 @@ static void hime_engine_class_init (HimeEngineClass *klass) {
     engine_class->reset = hime_engine_reset;
     engine_class->disable = hime_engine_disable;
     engine_class->set_content_type = hime_engine_set_content_type;
+    engine_class->set_cursor_location = hime_engine_set_cursor_location;
     IBUS_OBJECT_CLASS (klass)->destroy = hime_engine_destroy;
 }
 

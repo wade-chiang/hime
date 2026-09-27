@@ -420,6 +420,7 @@ void show_input_method_name_on_gtab ();
 
 extern GtkWidget *win_gtab, *win_pho;
 void move_in_win (ClientState *cs, int x, int y);
+void move_IC_in_win (ClientState *cs);
 
 // Create the input window of the focused client's input method again if
 // it is the wrong kind now (hime_input_window_stale ()): the focus moved
@@ -471,9 +472,12 @@ void refresh_input_window (gboolean show) {
         show = TRUE;
     }
     // Show it as on focus in (it may be hidden now for another reason,
-    // e.g. a tool connecting); with hime-pop-up-win, only with input
+    // e.g. a tool connecting), where the input style now says (the client
+    // may not tell its cursor location again); with hime-pop-up-win, only
+    // with input
     INMD *input_method = current_input_method ();
     if (show && current_CS->b_im_enabled && input_method->win_funcs.show_input_window) {
+        move_IC_in_win (current_CS);
         input_method->win_funcs.show_input_window ();
     }
     current_CS = cs;
@@ -539,6 +543,15 @@ void move_IC_in_win (ClientState *cs) {
    dbg("move_IC_in_win %d,%d\n", cs->spot_location.x, cs->spot_location.y);
 #endif
     Window inpwin = cs->client_win;
+
+    // Screen coordinates already (the IBus engine), where the window can be
+    // placed: on X11 (on GNOME, Xwayland's root is the screen at scale 1)
+    if (cs->screen_spot && dpy) {
+        if (cs == current_CS) {
+            move_in_win (cs, cs->spot_location.x, cs->spot_location.y);
+        }
+        return;
+    }
 
     if (!inpwin || !dpy) {
         // Without an X window (a native Wayland client), or without an X

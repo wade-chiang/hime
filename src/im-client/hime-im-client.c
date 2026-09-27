@@ -47,7 +47,7 @@
 // after reconnecting; they are kept in handle->flag
 #define REQUESTED_FLAGS \
     (FLAG_HIME_client_handle_use_preedit | FLAG_HIME_client_handle_raise_window | \
-     FLAG_HIME_client_handle_notify)
+     FLAG_HIME_client_handle_notify | FLAG_HIME_client_handle_screen_spot)
 
 static int __is_special_user;
 static void init_is_special_user (void) {

@@ -244,6 +244,10 @@ static void do_set_flags (HIME_req *req,
         cs->use_preedit = TRUE;
     }
 
+    if (req->flag & FLAG_HIME_client_handle_screen_spot) {
+        cs->screen_spot = TRUE;
+    }
+
     int rflags = 0;
     if (hime_pop_up_win) {
         rflags = FLAG_HIME_srv_ret_status_use_pop_up;

@@ -54,7 +54,10 @@ enum {
     FLAG_HIME_client_handle_has_focus = 1,
     FLAG_HIME_client_handle_use_preedit = 2,
     FLAG_HIME_client_handle_raise_window = 0x1000,  // for mozilla, dirty fix
-    FLAG_HIME_client_handle_notify = 0x2000         // wants notifications
+    FLAG_HIME_client_handle_notify = 0x2000,        // wants notifications
+    // its cursor locations are screen coordinates, not relative to its
+    // window (the IBus engine: GNOME gives them so)
+    FLAG_HIME_client_handle_screen_spot = 0x4000
 };
 
 enum {
