@@ -1,0 +1,7 @@
+@program gtk3-text-input-test
+@compositor kwin
+@method anthy
+@conf hime-edit-display=2
+# Anthy (Japanese): nihongo, space converts to 日本語, shown in the preedit;
+# Enter commits it, in an application with the HIME GTK module.
+--im hime n i h o n g o <space> @check <enter>
