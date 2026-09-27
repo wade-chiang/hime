@@ -1398,8 +1398,13 @@ void hime_forget_client (ClientState *cs) {
     }
 }
 
+static gint64 last_focus_out_time;
+
 int hime_FocusIn (ClientState *cs) {
     Window win = cs->client_win;
+
+    // a focus out after this one is not a repeat of the one before
+    last_focus_out_time = 0;
 
     reset_current_in_win_xy ();
 
@@ -1469,8 +1474,6 @@ int xim_hime_FocusIn (IMChangeFocusStruct *call_data) {
     return True;
 }
 #endif
-
-static gint64 last_focus_out_time;
 
 int hime_FocusOut (ClientState *cs) {
     gint64 t = current_time ();

@@ -17,7 +17,7 @@
 			<license>LGPL-2.1</license>
 			<author>The HIME team</author>
 			<icon>%HIME_ICON%</icon>
-			<layout>us</layout>
+			<layout>default</layout>
 			<longname>HIME</longname>
 			<description>HIME Input Method</description>
 			<symbol>中</symbol>

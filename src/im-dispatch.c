@@ -278,7 +278,14 @@ static void do_get_preedit (const int fd, ClientState *cs) {
     // for a mouse action)
     ClientState *const current = current_CS;
     current_CS = cs;
-    int attrN = hime_get_preedit (cs, str, attr, &cursor, &sub_comp_len);
+    int attrN = 0;
+    // The engines' buffers hold the focused client's input: another client
+    // (e.g. an IBus engine resetting while a HIME module client types) has
+    // none
+    str[0] = '\0';
+    if (cs == hime_focused_client ()) {
+        attrN = hime_get_preedit (cs, str, attr, &cursor, &sub_comp_len);
+    }
     current_CS = current;
 
     if (hime_edit_display & (HIME_EDIT_DISPLAY_BOTH | HIME_EDIT_DISPLAY_OVER_THE_SPOT)) {

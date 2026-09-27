@@ -277,6 +277,7 @@ static gboolean hime_engine_process_key_event (IBusEngine *ibus_engine, guint ke
 static void hime_engine_focus_in (IBusEngine *ibus_engine) {
     HimeEngine *engine = (HimeEngine *) ibus_engine;
     DBG ("focus in\n");
+    memset (engine->eaten, 0, sizeof (engine->eaten));
     engine->focused = TRUE;
     if (engine->bypass) {
         return;
@@ -293,8 +294,13 @@ static void hime_engine_focus_in (IBusEngine *ibus_engine) {
 static void hime_engine_focus_out (IBusEngine *ibus_engine) {
     HimeEngine *engine = (HimeEngine *) ibus_engine;
     DBG ("focus out\n");
+    memset (engine->eaten, 0, sizeof (engine->eaten));
+    // Once: IBus sends another when it moves the engine to its fake input
+    // context, and resetting HIME again would show its window again, right
+    // after a focus out the daemon takes the second for a repeat of
+    const gboolean was_focused = engine->focused;
     engine->focused = FALSE;
-    if (engine->hime_ch) {
+    if (was_focused && engine->hime_ch) {
         hime_im_client_reset (engine->hime_ch);
         hime_im_client_focus_out (engine->hime_ch);
     }
@@ -308,6 +314,10 @@ static void hime_engine_focus_out (IBusEngine *ibus_engine) {
 static void hime_engine_set_cursor_location (IBusEngine *ibus_engine, gint x, gint y, gint w, gint h) {
     HimeEngine *engine = (HimeEngine *) ibus_engine;
     DBG ("cursor %d,%d %dx%d\n", x, y, w, h);
+    // GNOME Shell resets it so on each focus out: no cursor
+    if (!x && !y && !w && !h) {
+        return;
+    }
     if (!engine->hime_ch || engine->bypass) {
         return;
     }
@@ -315,8 +325,27 @@ static void hime_engine_set_cursor_location (IBusEngine *ibus_engine, gint x, gi
     after_request (engine);
 }
 
+// With has-focus-id (see create_engine): IBus moves its global engine to a
+// "fake" input context of its own when no text field is focused: that is
+// no focus for HIME (its window would stay, and mouse actions commit
+// nowhere)
+static void hime_engine_focus_in_id (IBusEngine *ibus_engine, const gchar *object_path,
+                                     const gchar *client) {
+    DBG ("focus in %s (%s)\n", object_path, client);
+    if (client && !strncmp (client, "fake", 4)) {
+        hime_engine_focus_out (ibus_engine);
+        return;
+    }
+    hime_engine_focus_in (ibus_engine);
+}
+
+static void hime_engine_focus_out_id (IBusEngine *ibus_engine, const gchar *object_path) {
+    hime_engine_focus_out (ibus_engine);
+}
+
 static void hime_engine_reset (IBusEngine *ibus_engine) {
     HimeEngine *engine = (HimeEngine *) ibus_engine;
+    memset (engine->eaten, 0, sizeof (engine->eaten));
     if (engine->hime_ch) {
         hime_im_client_reset (engine->hime_ch);
     }
@@ -378,10 +407,25 @@ static void hime_engine_class_init (HimeEngineClass *klass) {
     engine_class->disable = hime_engine_disable;
     engine_class->set_content_type = hime_engine_set_content_type;
     engine_class->set_cursor_location = hime_engine_set_cursor_location;
+    engine_class->focus_in_id = hime_engine_focus_in_id;
+    engine_class->focus_out_id = hime_engine_focus_out_id;
     IBUS_OBJECT_CLASS (klass)->destroy = hime_engine_destroy;
 }
 
 static void hime_engine_init (HimeEngine *engine) {
+}
+
+// Engines with has-focus-id, so that IBus tells which input context gets
+// the focus (the default engines have not, and it cannot be set later)
+static IBusEngine *create_engine (IBusFactory *factory, const gchar *engine_name, gpointer data) {
+    static int id;
+    char *path = g_strdup_printf ("/org/freedesktop/IBus/Engine/Hime/%d", ++id);
+    IBusEngine *engine = g_object_new (hime_engine_get_type (), "engine-name", engine_name,
+                                       "object-path", path,
+                                       "connection", ibus_service_get_connection (IBUS_SERVICE (factory)),
+                                       "has-focus-id", TRUE, NULL);
+    g_free (path);
+    return engine;
 }
 
 static void bus_disconnected (IBusBus *bus, gpointer data) {
@@ -407,6 +451,7 @@ int main (int argc, char **argv) {
 
     IBusFactory *factory = ibus_factory_new (ibus_bus_get_connection (bus));
     ibus_factory_add_engine (factory, "hime", hime_engine_get_type ());
+    g_signal_connect (factory, "create-engine", G_CALLBACK (create_engine), NULL);
     ibus_bus_request_name (bus, "org.freedesktop.IBus.Hime", 0);
 
     ibus_main ();
