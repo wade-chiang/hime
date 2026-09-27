@@ -13,13 +13,14 @@
 - 在支援 layer-shell 的合成器上（niri、sway、Hyprland、KDE 等），HIME 主程式直接跑在 Wayland 上，視窗以 layer-shell 顯示：固定在設定的位置、不會搶走鍵盤焦點，不需要 Xwayland。
 - 在 GNOME 等沒有 layer-shell 的桌面上，HIME 主程式與它的視窗跑在 Xwayland 上。
 - 在支援 input-method-v2 的合成器上（niri、sway、Hyprland 等），HIME 主程式同時是 Wayland 的輸入法：使用 text-input 協定的程式不需要 HIME 的 IM module 也能用 HIME 輸入，例如 foot、GTK 4 與 Qt 6 程式（未設定 IM module 時）、GTK 3 程式（`GTK_IM_MODULE=wayland`）、Firefox、Chromium（加上 `--enable-wayland-ime`）。
+- 在 GNOME 上，HIME 可以作為 IBus 的輸入來源（`hime-ibus`）：在「設定 → 鍵盤 → 輸入來源」加入 HIME；使用 text-input 的程式不需要 HIME 的 IM module，「跟著游標」時輸入視窗出現在文字游標下方。
 - 在 KDE Plasma 上，HIME 可以作為 KWin 的輸入法（input-method-v1）：在「系統設定 → 鍵盤 → 虛擬鍵盤」選擇 HIME，由 KWin 啟動 HIME；使用 text-input 的程式同樣不需要 HIME 的 IM module。
 - 啟動時自動選擇；可用 `HIME_BACKEND=x11` 或 `HIME_BACKEND=wayland` 強制指定。
 - 以固定位置的輸入視窗（外觀設定 → 固定輸入視窗位置）為主。
 
 驗證範圍：
 
-- 自動測試：`make check-session`，在 headless mutter、sway 或 KWin 中以模擬按鍵輸入；sway 與 KWin 中另以截圖檢查輸入視窗的位置。
+- 自動測試：`make check-session`，在 headless mutter、sway、KWin 或 GNOME Shell 中以模擬按鍵輸入；sway、KWin 與 GNOME 中另以截圖檢查輸入視窗的位置。
 - 真實桌面測試程式：同樣的測試程式，在實際登入的桌面中，以已安裝的套件與嘸蝦米字根表輸入。
 - 實際使用：在真實程式中手動打字。
 
@@ -34,10 +35,10 @@ HIME 作為 Wayland 輸入法（text-input 程式，不經 HIME module）：
 
 | 程式 | 自動測試 | 實際使用 |
 |---|---|---|
-| GTK 3（`GTK_IM_MODULE=wayland`） | sway、KWin 6.7 | 尚未 |
-| GTK 4 | sway、KWin 6.7 | Ghostty（niri 26.04） |
-| Qt 6（`QT_IM_MODULE=wayland`） | sway、KWin 6.7 | FeatherPad（niri 26.04） |
-| 其他 text-input 程式 | — | foot（niri 26.04） |
+| GTK 3（`GTK_IM_MODULE=wayland`） | sway、KWin 6.7、GNOME 50 | 尚未 |
+| GTK 4 | sway、KWin 6.7、GNOME 50 | Ghostty（niri 26.04）、gnome-text-editor（GNOME 50） |
+| Qt 6（`QT_IM_MODULE=wayland`） | sway、KWin 6.7、GNOME 50 | FeatherPad（niri 26.04） |
+| 其他 text-input 程式 | — | foot（niri 26.04、GNOME 50） |
 
 以上三個程式在 niri 26.04 上也實測過「跟著游標」：HIME 的輸入視窗出現在文字游標下方。KDE Plasma 尚未實機測試。
 
@@ -85,6 +86,13 @@ systemctl --user set-environment GTK_IM_MODULE=hime QT_IM_MODULE=hime QT_IM_MODU
 HIME 會在第一次打字時自動啟動。
 
 #### GNOME
+
+HIME 可以作為 IBus 的輸入來源：到「設定 → 鍵盤 → 輸入來源 → ＋」加入「HIME」，用右上角選單或 Super+Space 切換輸入來源；選了 HIME 之後，Ctrl+Space 照舊切換中英（`hime-init-im-enabled` 設定新欄位一開始是否為中文）。
+
+- 使用 text-input 的程式（GTK 4、foot，以及未設定 IM module 的 GTK 3 與 Qt 程式）經 IBus 輸入；「跟著游標」時輸入視窗出現在文字游標下方。
+- 設定 `GTK_IM_MODULE=hime`、`QT_IM_MODULE=hime` 的程式照舊透過 HIME 的 IM module 輸入，輸入視窗固定位置。
+- 安裝後需重新登入，IBus 才會列出 HIME。
+- 使用分數縮放、或開啟 mutter 的 `xwayland-native-scaling` 時，跟著游標的位置可能有偏差。
 
 GNOME 登入時會把 `QT_IM_MODULE`、`QT_IM_MODULES`、`XMODIFIERS` 設成 IBus 的值，所以 Qt 程式可能仍然使用 IBus；GTK 程式不受影響。
 

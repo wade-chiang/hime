@@ -159,7 +159,20 @@ keeping HIME's own UI and typing feel. Phases:
    window is an overlay input panel (one at a time). `@compositor kwin`
    runs session tests in a headless KWin; `kwin-*` cases mirror
    `wl-im-*`.
-5. IBus-compatible frontend plus a GNOME Shell extension (GNOME/Mutter).
+5. Done (GNOME/Mutter, which offers no input method protocol: GNOME
+   Shell passes text-input keys to IBus): `src/ibus/hime-ibus`, an IBus
+   engine that is a HIME client like the modules (component
+   `src/ibus/hime.xml`, `--enable-ibus-engine`). It asks for the preedit,
+   notifications and `FLAG_HIME_client_handle_screen_spot` on each new
+   connection (IBus may start it before the daemon); screen-spot clients
+   get their window at the cursor in screen coordinates
+   (`move_IC_in_win`), right on Xwayland, where the daemon runs on GNOME.
+   It uses has-focus-id (a custom create-engine) to treat IBus's "fake"
+   context as no focus, sends one focus out per focus, ignores the
+   (0,0,0,0) cursor GNOME Shell resets on focus out, and passes on
+   repeats of keys whose press it ate (GNOME drops them otherwise).
+   `@compositor gnome` runs session tests in a headless GNOME Shell;
+   `gnome-*` cases mirror `wl-im-*`.
 
 Both input window styles must work on Wayland and stay switchable at
 runtime from hime-setup, as on X11 (`hime-input-style`, applied by
@@ -236,6 +249,20 @@ Known gaps after phase 1 (from review, not fixed yet):
 - KWin 6.7 removed text-input-v1: Chromium/Electron need
   `--enable-wayland-ime --wayland-text-input-version=3`. Qt 6 uses
   text-input-v2 on KWin.
+- Headless GNOME Shell for tests (`@compositor gnome`): `--unsafe-mode`
+  for its Eval and Screenshot D-Bus methods; it hangs starting Xwayland
+  when `SSH_CONNECTION` is set; it has no keyboard until a Mutter
+  RemoteDesktop session gives it one, and a keyboard going away resets
+  the input method focus, so `rd-type.py --keep` holds one session that
+  types all keys (FIFO); it starts in the overview (hidden by Eval); it
+  restarts ibus-daemon with `--xim` once Xwayland is up; IBus finds the
+  engine through `IBUS_COMPONENT_PATH` (keep `/usr/share/ibus/component`
+  in it) and launches `<exec>` without a PATH search. `hime-ibus` must
+  not auto-start the installed daemon there
+  (`HIME_IM_CLIENT_NO_AUTO_EXEC`). IBus drops engines' output:
+  `HIME_IBUS_DEBUG=FILE` logs what hime-ibus sees.
+- The daemon ignores a focus out within 100 ms of another
+  (`hime_FocusOut`); a focus in in between now resets that.
 - A popup surface's wl_surface must not be destroyed before its role:
   GtkWindow's unmap destroys it, and gtk-layer-shell overrides that class
   handler for every window, so signal handlers and emission hooks run too
