@@ -96,6 +96,8 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     # not a remote session (gnome-shell hangs starting Xwayland when run
     # over SSH)
     unset SSH_CONNECTION SSH_CLIENT SSH_TTY
+    # the private HOME's, not the user's (gsettings would write there)
+    unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME
     export XMODIFIERS=@im=ibus
     # no gvfs daemons, which would leave a gvfs directory behind
     export GIO_USE_VFS=local
@@ -236,7 +238,15 @@ if [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
     }
     # Our daemon started Xwayland, and GNOME Shell restarts IBus with XIM
     # then, and with it HIME's engine: wait for that
-    wait_for 'pgrep -f -- "ibus-daemon .*--xim" >/dev/null' || true
+    # (this session's: the user's may run with --xim too)
+    ibus_xim() {
+        local pid
+        for pid in $(pgrep -f -- "ibus-daemon .*--xim"); do
+            tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null | grep -qx "HIME_SESSION_TMP=$tmp" && return 0
+        done
+        return 1
+    }
+    wait_for ibus_xim || true
     # HIME's input source, through IBus
     if ! wait_for 'shell_eval "Main.inputMethod._currentSource?.id" | grep -q "hime" &&
             [[ "$(WAYLAND_DISPLAY=$wl_display ibus engine 2>/dev/null)" == hime ]]'; then
@@ -248,6 +258,7 @@ if [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
     # keyboard focus
     "$here/rd-type.py" --keep &
     keyboard_pid=$!
+    wait_for '[[ -p "$XDG_RUNTIME_DIR/rd-type.fifo" ]]' 
     # the shell starts in the overview, where new windows get no focus
     shell_eval 'Main.overview.hide()' >/dev/null
     wait_for 'shell_eval "Main.overview.visible || Main.overview.animationInProgress" | grep -q "false"'

@@ -14,6 +14,7 @@ Usage: rd-type.py KEY...
 """
 
 import os
+import signal
 
 import sys
 import time
@@ -46,6 +47,8 @@ FIFO = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "rd-type.fifo")
 if sys.argv[1:] != ["--keep"] and os.path.exists(FIFO):
     reply = FIFO + "." + str(os.getpid())
     os.mkfifo(reply)
+    # the --keep one may have died: do not wait forever for it
+    signal.alarm(60)
     with open(FIFO, "w") as fifo:
         fifo.write("\x1f".join([reply] + sys.argv[1:]) + "\n")
     with open(reply) as done:
