@@ -44,7 +44,7 @@ HIME 作為 Wayland 輸入法（text-input 程式，不經 HIME module）：
 
 ### 安裝
 
-Arch Linux：
+#### Arch Linux
 
 ```bash
 git clone https://github.com/wade-chiang/hime.git
@@ -52,11 +52,23 @@ cd hime/distro/archlinux
 makepkg -si -p PKGBUILD-wayland
 ```
 
-其他發行版，自行編譯：
+`PKGBUILD-wayland` 會從 GitHub 抓 master 編譯。之後要更新，在同一個目錄先 `git pull`（取得最新的 PKGBUILD），再執行一次 `makepkg -si -p PKGBUILD-wayland`，makepkg 會抓最新的程式碼重新編譯，套件版本號會跟著 master 更新。
+
+- 編譯時若已安裝 anthy、libchewing，會一併編出日文（Anthy）與新酷音模組；裝了 ibus 會編出 GNOME 用的 IBus 引擎。
+- 會與官方的 `hime`、`hime-git` 套件衝突，安裝時 pacman 會詢問是否取代。
+
+#### 安裝或更新後
+
+- 重新啟動 HIME：`pkill -x hime; setsid -f hime`（或登出再登入）。已開啟的程式會自動重新連線。
+- GNOME：第一次安裝後需重新登入，IBus 才會列出 HIME，再到「設定 → 鍵盤 → 輸入來源」加入。
+- KDE Plasma：到「系統設定 → 鍵盤 → 虛擬鍵盤」選擇 HIME。
+
+#### 其他發行版，自行編譯
+
+需要的開發套件：GTK 3、gtk-layer-shell、wayland（含 wayland-scanner）、xkbcommon、libXtst；可選：GTK 4、Qt 5／Qt 6、IBus、anthy、libchewing（有裝的會自動偵測並編譯對應部分）。
 
 ```bash
 autoreconf -fi
-# 需要 gtk-layer-shell 才能在 niri 等合成器上以 layer-shell 顯示視窗
 ./configure --prefix=/usr --with-gtk=3.0 --disable-system-tray
 make
 sudo make install
@@ -64,7 +76,7 @@ sudo gtk-query-immodules-3.0 --update-cache
 sudo gio-querymodules /usr/lib/gtk-4.0/4.0.0/immodules
 ```
 
-GTK 4 與 Qt 的 module 目錄依發行版而異（例如 Debian 在 `/usr/lib/x86_64-linux-gnu`）；Qt 的位置可以用 `--with-qt5-im-module-path`、`--with-qt6-im-module-path` 指定。
+GTK 4 與 Qt 的 module 目錄依發行版而異（例如 Debian 在 `/usr/lib/x86_64-linux-gnu`）；Qt 的位置可以用 `--with-qt5-im-module-path`、`--with-qt6-im-module-path` 指定。沒有 gtk-layer-shell 時，HIME 在 Wayland 上會改在 Xwayland 執行。
 
 ### 設定
 
