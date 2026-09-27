@@ -1,0 +1,6 @@
+@program gtk3-text-input-test
+@compositor gnome
+# Simplified Chinese output, in an application using text-input:
+# hime-gb-toggle (as hime-setup's button, and hime-sim/hime-trad; there is
+# no tray on Wayland) switches it on and off while typing.
+e a <space> @exec ../../src/hime-gb-toggle e a <space> @exec ../../src/hime-gb-toggle e a <space>
