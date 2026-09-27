@@ -83,3 +83,4 @@ distro/archlinux/hime/
 distro/archlinux/*.pkg.tar.*
 src/ibus/hime-ibus
 src/ibus/hime.xml
+tests/session/wl-click

@@ -1,0 +1,10 @@
+@program gtk3-text-input-test
+@compositor kwin
+@conf hime-input-style=2
+@conf hime-root-x=100
+@conf hime-root-y=400
+@conf hime-pop-up-win=0
+# The symbol table, in an application with the HIME GTK module: a click on
+# the keys typed in HIME's window opens it below, a click on a symbol (★)
+# commits it.
+--im hime b @exec wl-click:158,431 @exec wl-click:445,527 @check a <space>

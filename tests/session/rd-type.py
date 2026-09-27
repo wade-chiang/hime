@@ -3,7 +3,8 @@
 interface, as a keyboard would: Mutter has no virtual keyboard protocol for
 wl-type, which runs this instead.  Same keys as wl-type (a character of
 the "us" layout, <space> <enter> <bs> <tab> <esc> <shift>, S- and C-
-prefixes, @hold KEY).
+prefixes, @hold KEY), and @click:X,Y clicks the left mouse button at X,Y
+(wl-click runs it so on GNOME).
 
 Usage: rd-type.py KEY...
        rd-type.py --keep: keep a session (a keyboard) until killed: without
@@ -115,10 +116,29 @@ def type_key(token, hold):
     time.sleep(0.05)
 
 
+def click(point):
+    x, y = (int(v) for v in point.split(","))
+    # Relative moves only (absolute ones need a screen cast stream): to
+    # the top left corner first
+    call(session, SESSION, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (-10000.0, -10000.0)))
+    call(session, SESSION, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (float(x) - 1, float(y))))
+    # then over the window, as a hand would (Xwayland takes a click that
+    # comes with the only move for one outside of X windows)
+    time.sleep(0.15)
+    call(session, SESSION, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (1.0, 0.0)))
+    time.sleep(0.1)
+    call(session, SESSION, "NotifyPointerButton", GLib.Variant("(ib)", (0x110, True)))
+    call(session, SESSION, "NotifyPointerButton", GLib.Variant("(ib)", (0x110, False)))
+    time.sleep(0.3)
+
+
 def type_keys(args):
     i = 0
     while i < len(args):
-        if args[i] == "@hold" and i + 1 < len(args):
+        if args[i].startswith("@click:"):
+            click(args[i][7:])
+            i += 1
+        elif args[i] == "@hold" and i + 1 < len(args):
             type_key(args[i + 1], 1.0)
             i += 2
         else:

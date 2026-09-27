@@ -1,0 +1,5 @@
+@program gtk3-text-input-test
+@compositor sway
+# Shift+Space switches to full width (hime-shift-space-eng-full): English
+# letters, digits and punctuation come out full width, Chinese as before.
+S-<space> C-<space> a b 1 , @check C-<space> a <space> , <space>

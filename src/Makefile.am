@@ -180,7 +180,8 @@ endif
 wl-im.o wl-im-v1.o wl-im-v2.o: $(WL_PROTOCOL_H)
 
 # keep the generated protocol code between builds
-.SECONDARY: $(WL_PROTOCOLS:%=%-protocol.c) fake-input-protocol.c
+.SECONDARY: $(WL_PROTOCOLS:%=%-protocol.c) fake-input-protocol.c \
+	wlr-virtual-pointer-unstable-v1-protocol.c
 
 hime_tsin_o = tsin.o tsin-util.o win0.o win1.o tsin-parse.o
 OBJS       += $(hime_tsin_o)
@@ -300,6 +301,13 @@ $(GTK4_TEXT_INPUT_TEST): ../tests/session/text-input-test.c
 	$(CC) -Wall -o $@ $< `pkg-config --cflags --libs gtk4`
 
 QT6_TEXT_INPUT_TEST = ../tests/session/qt6-text-input-test
+WL_CLICK = ../tests/session/wl-click
+
+$(WL_CLICK): ../tests/session/wl-click.c wlr-virtual-pointer-unstable-v1-client-protocol.h \
+		wlr-virtual-pointer-unstable-v1-protocol.c fake-input-client-protocol.h \
+		fake-input-protocol.c
+	$(CC) -Wall -I. -o $@ $< wlr-virtual-pointer-unstable-v1-protocol.c \
+		fake-input-protocol.c `pkg-config --cflags --libs wayland-client glib-2.0`
 
 $(QT6_TEXT_INPUT_TEST): ../tests/session/qt-text-input-test.cpp
 	$(CXX) -std=c++17 -Wall -fPIC -o $@ $< `pkg-config --cflags --libs Qt6Widgets`
@@ -312,7 +320,7 @@ $(WL_TYPE): ../tests/session/wl-type.c virtual-keyboard-unstable-v1-client-proto
 
 WL_IM_TESTS =
 if USE_WAYLAND_IM
-WL_IM_TESTS += $(WL_TYPE) $(GTK3_TEXT_INPUT_TEST)
+WL_IM_TESTS += $(WL_TYPE) $(WL_CLICK) $(GTK3_TEXT_INPUT_TEST)
 endif
 
 .PHONY: session-test-programs
@@ -471,7 +479,7 @@ clean:
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
 		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
 		$(GTK3_IM_TEST) $(GTK4_IM_TEST) $(GTK3_TEXT_INPUT_TEST) \
-		$(GTK4_TEXT_INPUT_TEST) $(QT6_TEXT_INPUT_TEST) $(WL_TYPE) \
+		$(GTK4_TEXT_INPUT_TEST) $(QT6_TEXT_INPUT_TEST) $(WL_TYPE) $(WL_CLICK) \
 		*-client-protocol.h *-protocol.c
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;
 

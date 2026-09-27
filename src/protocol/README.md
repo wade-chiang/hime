@@ -20,3 +20,7 @@ For the session tests only (`tests/session/wl-type`):
 - `fake-input.xml`: KWin's key injection, from plasma-wayland-protocols
   (https://invent.kde.org/libraries/plasma-wayland-protocols, `src/protocols/`,
   LGPL-2.1-or-later): KWin offers no virtual keyboard protocol.
+- `wlr-virtual-pointer-unstable-v1.xml`: mouse clicks on wlroots
+  compositors (`tests/session/wl-click`), from wlr-protocols
+  (https://gitlab.freedesktop.org/wlroots/wlr-protocols, `unstable/`,
+  MIT license in the file).

@@ -136,6 +136,8 @@ elif [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
     gsettings set org.gnome.desktop.search-providers disable-external true
     gsettings set org.gnome.desktop.screensaver lock-enabled false
     gsettings set org.gnome.desktop.session idle-delay 0
+    # rd-type.py clicks from the top left corner
+    gsettings set org.gnome.desktop.interface enable-hot-corners false
     # HIME's engine from the build tree, next to IBus's own components
     mkdir -p "$tmp/ibus"
     sed "s|<exec>.*</exec>|<exec>/usr/bin/env LD_LIBRARY_PATH=$top/src/im-client $top/src/ibus/hime-ibus --ibus</exec>|" \
