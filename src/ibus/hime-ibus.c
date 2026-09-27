@@ -72,6 +72,10 @@ typedef struct {
     gboolean focused;
 
     guint8 eaten[KEYCODES_N];
+
+    // the text cursor, below which HIME's window goes (OverSpot)
+    gboolean has_cursor;
+    int cursor_x, cursor_y;
 } HimeEngine;
 
 typedef struct {
@@ -285,6 +289,11 @@ static void hime_engine_focus_in (IBusEngine *ibus_engine) {
     hime_engine_open (engine);
     if (engine->hime_ch) {
         hime_im_client_focus_in (engine->hime_ch);
+        // it may have come before (no connection yet, or while not
+        // focused); the daemon places the window of the focused client
+        if (engine->has_cursor) {
+            hime_im_client_set_cursor_location (engine->hime_ch, engine->cursor_x, engine->cursor_y);
+        }
     }
     after_request (engine);
 }
@@ -318,10 +327,16 @@ static void hime_engine_set_cursor_location (IBusEngine *ibus_engine, gint x, gi
     if (!x && !y && !w && !h) {
         return;
     }
-    if (!engine->hime_ch || engine->bypass) {
+    engine->has_cursor = TRUE;
+    engine->cursor_x = x;
+    engine->cursor_y = y + h;
+    if (!engine->focused || engine->bypass) {
         return;
     }
-    hime_im_client_set_cursor_location (engine->hime_ch, x, y + h);
+    hime_engine_open (engine);
+    if (engine->hime_ch) {
+        hime_im_client_set_cursor_location (engine->hime_ch, engine->cursor_x, engine->cursor_y);
+    }
     after_request (engine);
 }
 
