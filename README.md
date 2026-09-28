@@ -61,9 +61,8 @@ makepkg -si -p PKGBUILD-wayland
 
 #### 安裝或更新後
 
-- 重新啟動 HIME：`pkill -x hime; setsid -f hime`（或登出再登入）。已開啟的程式會自動重新連線。
-- GNOME：第一次安裝後需重新登入，IBus 才會列出 HIME，再到「設定 → 鍵盤 → 輸入來源」加入。
-- KDE Plasma：到「系統設定 → 鍵盤 → 虛擬鍵盤」選擇 HIME。
+- 第一次安裝：照下面「設定」的三步設定，再登出、重新登入。
+- 更新後：重新啟動 HIME，執行 `pkill -x hime; setsid -f hime`，或登出再登入。已開啟的程式會自動重新連線。GNOME 上要重新登入，IBus 才會載入新版的 HIME 引擎。
 
 #### 其他發行版，自行編譯
 
@@ -82,7 +81,24 @@ GTK 4 與 Qt 的 module 目錄依發行版而異（例如 Debian 在 `/usr/lib/x
 
 ### 設定
 
-建立 `~/.config/environment.d/hime.conf`。建議和 fcitx5 相同的設定：GTK 程式與 Qt 6 程式透過合成器輸入（text-input），輸入視窗跟著游標；Qt 5 程式透過 HIME 的 IM module，純 X11 程式透過 XIM（限制見「已知限制」）。
+安裝後依下面三步設定：環境變數、依桌面設定、HIME 本身的選項。
+
+#### 第一步：環境變數
+
+建議採用和 fcitx5 相同的設定：
+- GTK 程式與 Qt 6 程式透過合成器輸入（text-input），輸入視窗跟著游標。
+- Qt 5 程式透過 HIME 的 IM module。
+- 純 X11 程式透過 XIM。
+
+建立 `~/.config/environment.d/hime.conf`：
+
+```bash
+mkdir -p ~/.config/environment.d
+printf '%s\n' 'QT_IM_MODULE=hime' 'QT_IM_MODULES=wayland;hime' 'XMODIFIERS=@im=hime' \
+    > ~/.config/environment.d/hime.conf
+```
+
+檔案內容：
 
 ```
 QT_IM_MODULE=hime
@@ -92,8 +108,9 @@ XMODIFIERS=@im=hime
 
 - 不設定 `GTK_IM_MODULE`：GTK 在 Wayland 上會自動使用 text-input。
 - `QT_IM_MODULES` 只有 Qt 6 會讀，它會先用 text-input；Qt 5 只讀 `QT_IM_MODULE`，使用 HIME 的 module。
+- `XMODIFIERS` 給純 X11 程式（xterm 等）找到 HIME 的 XIM。
 
-若想讓所有程式都透過 HIME 的 IM module 輸入（和 X11 上一樣，輸入視窗固定位置，每個程式各自記住中英狀態），改用：
+若想讓所有程式都透過 HIME 的 IM module 輸入，改用下面的內容。這樣和 X11 上一樣，輸入視窗固定位置，每個程式各自記住中英狀態：
 
 ```
 GTK_IM_MODULE=hime
@@ -102,54 +119,86 @@ QT_IM_MODULES=hime
 XMODIFIERS=@im=hime
 ```
 
-`environment.d` 只在 systemd 使用者服務啟動時讀取。若登出再登入後沒有生效（例如還有其他登入中的 session），改完檔案後執行下面這行再重新登入（`systemctl --user unset-environment` 移除不了 `environment.d` 設定的變數）：
+改完後登出再登入。`environment.d` 只在 systemd 使用者服務啟動時讀取，若還有其他登入中的 session（例如 tmux、ssh），這項服務不會重新啟動。這時先執行下面這行再重新登入：
 
 ```bash
 systemctl --user daemon-reload
 ```
 
-HIME 會在第一次透過 IM module 打字時自動啟動；GNOME（IBus）與 KDE Plasma（KWin）也會自動啟動 HIME。照建議設定時，niri 等合成器上多半沒有程式透過 IM module，需要在合成器設定中登入時啟動 HIME，例如 niri 的 `spawn-at-startup "hime"`。
+`systemctl --user unset-environment` 移除不了 `environment.d` 設定的變數，要用上面這行。確認目前的設定：
 
-#### 中英狀態
+```bash
+systemctl --user show-environment | grep -E 'IM_MODULE|XMODIFIERS'
+```
 
-和 fcitx5 一樣，透過合成器輸入的程式各自記住中英狀態與輸入法（透過 IM module 的程式本來就各自記住）：
+#### 第二步：依桌面設定
 
-- niri、sway、Hyprland、labwc、KDE Plasma：每個視窗一份。
-- GNOME：每個程式一份。GNOME 只把目前的程式告訴 xdg-desktop-portal-gnome，HIME 照 fcitx5 的做法從中讀取；沒有執行 xdg-desktop-portal-gnome 時，全部共用一份。
-- 同一個視窗裡的分頁（瀏覽器、終端機）共用一份。
-- 想要全部共用：在 hime-setup 勾選「所有程式共用相同的輸入法狀態」。
+##### niri
 
-#### GNOME
+在 `~/.config/niri/config.kdl`（或它 `include` 的檔案）加上登入時啟動 HIME：
 
-HIME 可以作為 IBus 的輸入來源：到「設定 → 鍵盤 → 輸入來源 → ＋」加入「HIME」，用右上角選單或 Super+Space 切換輸入來源；選了 HIME 之後，Ctrl+Space 照舊切換中英（`hime-init-im-enabled` 設定新欄位一開始是否為中文）。
+```kdl
+spawn-at-startup "hime"
+```
 
-- 使用 text-input 的程式（GTK 4、foot，以及未設定 IM module 的 GTK 3 與 Qt 程式）經 IBus 輸入；「跟著游標」時輸入視窗出現在文字游標下方。
+用 `niri validate` 檢查設定，再重新登入。
+
+- 照第一步的建議設定時，沒有程式會透過 IM module 自動啟動 HIME，所以要自己啟動。
+- HIME 會自動改用 Wayland 與 layer-shell，並成為 niri 的輸入法，不需要視窗規則。舊版說明中的 `app-id="(?i)^hime$"` 視窗規則可以移除。
+- 要讓純 X11 程式使用 HIME，需安裝 `xwayland-satellite`，niri 會自動啟動它。HIME 登入時就會連上 Xwayland；不需要時可以在第一步的檔案加上 `HIME_NO_XIM=1`。
+
+##### sway、Hyprland、labwc 等 wlroots 合成器
+
+和 niri 一樣，要在登入時啟動 HIME：
+
+- sway：`~/.config/sway/config` 加上 `exec hime`
+- Hyprland：`~/.config/hypr/hyprland.conf` 加上 `exec-once = hime`
+- labwc：`~/.config/labwc/autostart` 加上 `hime &`
+
+##### GNOME
+
+GNOME 沒有輸入法協定，HIME 是 IBus 的一個輸入來源：
+
+1. 安裝後重新登入，IBus 才會列出 HIME。
+2. 到「設定 → 鍵盤 → 輸入來源 → ＋」加入「HIME」。
+3. 用右上角選單或 Super+Space 切換到 HIME。選了 HIME 之後，Ctrl+Space 照舊切換中英。
+
+HIME 會由 IBus 自動啟動，不用另外設定開機啟動。
+
+- 使用 text-input 的程式（GTK、foot 等）經 IBus 輸入。設成「跟著游標」時（見第三步），輸入視窗出現在文字游標下方。
 - 設定 `GTK_IM_MODULE=hime`、`QT_IM_MODULE=hime` 的程式照舊透過 HIME 的 IM module 輸入，輸入視窗固定位置。
-- 安裝後需重新登入，IBus 才會列出 HIME。
-- 使用分數縮放、或開啟 mutter 的 `xwayland-native-scaling` 時，跟著游標的位置可能有偏差。
+- GNOME 登入時會把 `QT_IM_MODULE`、`QT_IM_MODULES`、`XMODIFIERS` 設成 IBus 的值，所以 Qt 程式可能仍然使用 IBus；GTK 程式不受影響。
+- 使用分數縮放，或開啟 mutter 的 `xwayland-native-scaling` 時，跟著游標的位置可能有偏差。
 
-GNOME 登入時會把 `QT_IM_MODULE`、`QT_IM_MODULES`、`XMODIFIERS` 設成 IBus 的值，所以 Qt 程式可能仍然使用 IBus；GTK 程式不受影響。
+##### KDE Plasma
 
-#### niri 及其他支援 layer-shell 的合成器
+1. 到「系統設定 → 鍵盤 → 虛擬鍵盤」選擇「HIME」。
+2. 重新登入。
 
-不需要額外設定。HIME 會自動改用 Wayland 與 layer-shell，niri 也不需要 xwayland-satellite 或視窗規則；舊版說明中的 `app-id="(?i)^hime$"` 視窗規則可以移除。
+KWin 會啟動 HIME，並在 HIME 當掉時重新啟動它。若已經有 HIME 在執行（例如由 IM module 啟動），KWin 啟動的 HIME 會接手，已開的程式會自動重新連線。
 
-HIME 也會成為合成器的輸入法，兩種方式可以同時使用：
-
-- 有設定 `GTK_IM_MODULE=hime`、`QT_IM_MODULE=hime` 的程式，照舊透過 HIME 的 IM module 輸入。
-- 其他使用 text-input 的程式（foot、Chromium，以及照建議設定時的 GTK 與 Qt 6 程式）直接透過合成器輸入。
-
-Ghostty 預設只跑一個程式實例：已經有 Ghostty 在執行時，用不同環境變數再開，只會在原本的程式裡多開一個視窗，沿用原本的設定。要測試時可加上 `--gtk-single-instance=false`。
-
-同一時間只能有一個輸入法；若 fcitx5 或 IBus 已經佔用，HIME 會顯示「another Wayland input method is running」，只提供 IM module 的方式。設定 `HIME_NO_WAYLAND_IM=1` 可以關閉這個功能。
-
-#### KDE Plasma
-
-在「系統設定 → 鍵盤 → 虛擬鍵盤」選擇「HIME」。KWin 會啟動 HIME，並在 HIME 當掉時重新啟動它；若已經有 HIME 在執行（例如由 IM module 啟動），KWin 啟動的 HIME 會接手，已開的程式會自動重新連線。
-
-- 使用 text-input 的程式（GTK 3/4、Qt 6、foot 等）直接透過 KWin 輸入，「跟著游標」時輸入視窗出現在文字游標下方。
-- 設定 `GTK_IM_MODULE=hime`、`QT_IM_MODULE=hime` 的程式照舊透過 HIME 的 IM module 輸入，輸入視窗固定位置。若只想在 Plasma 中改走 text-input，可以把設定寫在 `~/.config/plasma-workspace/env/` 的腳本裡，不影響其他桌面。
+- 使用 text-input 的程式（GTK、Qt 6、foot 等）直接透過 KWin 輸入。設成「跟著游標」時（見第三步），輸入視窗出現在文字游標下方。
 - Chromium、Electron 程式需加上 `--enable-wayland-ime --wayland-text-input-version=3`。
+- 若只想在 Plasma 中使用某些環境變數，可以寫在 `~/.config/plasma-workspace/env/` 的腳本裡，不影響其他桌面。
+
+##### 輸入法之間
+
+- 同一時間只能有一個 Wayland 輸入法。若 fcitx5 或 IBus 已經佔用，HIME 會顯示「another Wayland input method is running」，只提供 IM module 的方式。設定 `HIME_NO_WAYLAND_IM=1` 可以關閉 HIME 的這個功能。
+- Ghostty 預設只跑一個程式實例：已經有 Ghostty 在執行時，用不同環境變數再開，只會在原本的程式裡多開一個視窗，沿用原本的設定。要測試時可加上 `--gtk-single-instance=false`。
+
+#### 第三步：HIME 的選項
+
+執行 `hime-setup` 設定以下選項：
+
+- **輸入視窗的位置**：在「外觀設定 → 固定輸入視窗位置」中，勾選「啟用」時，輸入視窗在「固定位置」所填的座標；不勾選時，輸入視窗跟著游標。
+- **新欄位一開始是中文或英文**：「直接進入中文輸入狀態 (限非XIM)」。不勾選時，新欄位從英文開始，按 Ctrl+Space 切換到中文。
+- **中英狀態共用或各自記住**：預設和 fcitx5 一樣，透過合成器輸入的程式各自記住中英狀態與輸入法；透過 IM module 的程式本來就各自記住。
+  - niri、sway、Hyprland、labwc、KDE Plasma：每個視窗一份。
+  - GNOME：每個程式一份。GNOME 只把目前的程式告訴 xdg-desktop-portal-gnome，HIME 照 fcitx5 的做法從中讀取；沒有執行 xdg-desktop-portal-gnome 時，全部共用一份。
+  - 同一個視窗裡的分頁（瀏覽器、終端機）共用一份。
+  - 想要全部共用：勾選「所有程式共用相同的輸入法狀態」。
+
+hime-setup 的設定存在 `~/.config/hime/`。
 
 ### 已知限制
 
