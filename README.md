@@ -109,6 +109,15 @@ systemctl --user unset-environment GTK_IM_MODULE
 
 HIME 會在第一次透過 IM module 打字時自動啟動；GNOME（IBus）與 KDE Plasma（KWin）也會自動啟動 HIME。照建議設定時，niri 等合成器上多半沒有程式透過 IM module，需要在合成器設定中登入時啟動 HIME，例如 niri 的 `spawn-at-startup "hime"`。
 
+#### 中英狀態
+
+和 fcitx5 一樣，透過合成器輸入的程式各自記住中英狀態與輸入法（透過 IM module 的程式本來就各自記住）：
+
+- niri、sway、Hyprland、labwc、KDE Plasma：每個視窗一份。
+- GNOME：每個程式一份。GNOME 只把目前的程式告訴 xdg-desktop-portal-gnome，HIME 照 fcitx5 的做法從中讀取；沒有執行 xdg-desktop-portal-gnome 時，全部共用一份。
+- 同一個視窗裡的分頁（瀏覽器、終端機）共用一份。
+- 想要全部共用：在 hime-setup 勾選「所有程式共用相同的輸入法狀態」。
+
 #### GNOME
 
 HIME 可以作為 IBus 的輸入來源：到「設定 → 鍵盤 → 輸入來源 → ＋」加入「HIME」，用右上角選單或 Super+Space 切換輸入來源；選了 HIME 之後，Ctrl+Space 照舊切換中英（`hime-init-im-enabled` 設定新欄位一開始是否為中文）。

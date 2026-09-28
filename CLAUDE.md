@@ -174,6 +174,21 @@ keeping HIME's own UI and typing feel. Phases:
    `@compositor gnome` runs session tests in a headless GNOME Shell;
    `gnome-*` cases mirror `wl-im-*`.
 
+6. fcitx5 parity.  Done: each window of the text-input applications
+   has its own ClientState (Chinese/English, input method), as X
+   clients' windows do: `src/wl-toplevel.c` follows the focused window
+   (wlr-foreign-toplevel-management, or plasma-window-management on
+   KWin, bound at version 17) and queues window events into the
+   `src/wl-im.c` queue; states are per window number, 0 for unknown
+   windows, freed on close. On GNOME only per application:
+   `src/ibus/gnome-app-monitor.c` reads GNOME Shell's replies to
+   xdg-desktop-portal-gnome's GetRunningApplications on a D-Bus monitor
+   connection (as fcitx5 5.1.23), and hime-ibus keeps a daemon
+   connection per application (`use_app ()`). `hime-single-state`
+   still shares one state. Tests: `*-windows*` cases open a second
+   window with `@exec gtk3-text-input-test:KEYS`. Left: XIM while the
+   daemon runs on the Wayland backend.
+
 Both input window styles must work on Wayland and stay switchable at
 runtime from hime-setup, as on X11 (`hime-input-style`, applied by
 `move_in_win()` in `src/eve.c`):
@@ -291,6 +306,13 @@ Known gaps after phase 1 (from review, not fixed yet):
 - In gtab, the keys typed only show in the application's preedit with
   `hime-on-the-spot-key=1`; otherwise they stay in HIME's window, and the
   preedit only holds the phrase buffer (phrase mode).
+- A GDBus monitor connection must drop every message in its filter
+  (return NULL): GDBus would answer method calls meant for others, and a
+  monitor that sends is disconnected. The filter runs in GDBus's worker
+  thread.
+- The GNOME test session starts `/usr/lib/xdg-desktop-portal-gnome`
+  itself (per-application state needs it); test windows without a
+  .desktop file are each an application (`window:N`) for GNOME Shell.
 - On niri, `niri msg -j layers` shows the daemon's surfaces (namespace
   `hime`, Overlay, keyboard interactivity None). A test daemon can run in
   the user's live session without touching theirs: private
