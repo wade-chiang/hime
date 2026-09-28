@@ -320,6 +320,8 @@ Known gaps after phase 1 (from review, not fixed yet):
   path of the session's socket.
 - `~/.config/environment.d` is only read when the systemd user manager
   starts, which may outlive GNOME logins (e.g. a tmux/ssh session).
+  `systemctl --user daemon-reload` reads it again; `unset-environment`
+  cannot remove what it set.
 - Test in the user's real GNOME session from a shell by taking
   `WAYLAND_DISPLAY`, `DISPLAY`, `DBUS_SESSION_BUS_ADDRESS` from a GUI
   process's `/proc/<pid>/environ`, and `GTK_PATH` / `LD_LIBRARY_PATH`

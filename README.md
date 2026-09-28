@@ -100,11 +100,10 @@ QT_IM_MODULES=hime
 XMODIFIERS=@im=hime
 ```
 
-`environment.d` 只在 systemd 使用者服務啟動時讀取。若登出再登入後沒有生效（例如還有其他登入中的 session），可以直接設定後重新登入（不要的變數用 `systemctl --user unset-environment` 移除）：
+`environment.d` 只在 systemd 使用者服務啟動時讀取。若登出再登入後沒有生效（例如還有其他登入中的 session），改完檔案後執行下面這行再重新登入（`systemctl --user unset-environment` 移除不了 `environment.d` 設定的變數）：
 
 ```bash
-systemctl --user set-environment QT_IM_MODULE=hime 'QT_IM_MODULES=wayland;hime' XMODIFIERS=@im=hime
-systemctl --user unset-environment GTK_IM_MODULE
+systemctl --user daemon-reload
 ```
 
 HIME 會在第一次透過 IM module 打字時自動啟動；GNOME（IBus）與 KDE Plasma（KWin）也會自動啟動 HIME。照建議設定時，niri 等合成器上多半沒有程式透過 IM module，需要在合成器設定中登入時啟動 HIME，例如 niri 的 `spawn-at-startup "hime"`。
