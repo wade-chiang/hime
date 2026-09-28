@@ -165,9 +165,10 @@ CFLAGS     += -DHIME_I18N_MESSAGE=1
 # protocols in protocol/.
 if USE_WAYLAND_IM
 WL_PROTOCOLS = input-method-unstable-v2 virtual-keyboard-unstable-v1 \
-		input-method-unstable-v1
+		input-method-unstable-v1 wlr-foreign-toplevel-management-unstable-v1 \
+		plasma-window-management
 WL_PROTOCOL_H = $(WL_PROTOCOLS:%=%-client-protocol.h)
-OBJS       += wl-im.o wl-im-v1.o wl-im-v2.o $(WL_PROTOCOLS:%=%-protocol.o)
+OBJS       += wl-im.o wl-im-v1.o wl-im-v2.o wl-toplevel.o $(WL_PROTOCOLS:%=%-protocol.o)
 endif
 
 %-client-protocol.h: protocol/%.xml
@@ -177,7 +178,7 @@ endif
 
 # Before the first build there are no .d files to tell make that wl-im.c
 # includes the generated headers.
-wl-im.o wl-im-v1.o wl-im-v2.o: $(WL_PROTOCOL_H)
+wl-im.o wl-im-v1.o wl-im-v2.o wl-toplevel.o: $(WL_PROTOCOL_H)
 
 # keep the generated protocol code between builds
 .SECONDARY: $(WL_PROTOCOLS:%=%-protocol.c) fake-input-protocol.c \

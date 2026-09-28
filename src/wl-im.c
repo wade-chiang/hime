@@ -25,8 +25,9 @@
 //
 // This is the core; the protocols are input-method-v2 (wl-im-v2.c:
 // wlroots compositors, niri, Hyprland) and input-method-v1 (wl-im-v1.c:
-// KWin).  All text-input applications share one ClientState, like one X
-// client.  The input method runs on GDK's own Wayland connection: its
+// KWin).  Each window of the text-input applications has a ClientState of
+// its own, as each window of an X client has, when the compositor tells
+// which one has the focus (wl-toplevel.c).  The input method runs on GDK's own Wayland connection: its
 // windows must be on the one of the input method (popups), and wlroots
 // only lets the virtual keyboard of that connection past the keyboard
 // grab.
@@ -69,9 +70,13 @@ static struct xkb_state *xkb_state;
 static gboolean active, bypass;
 static gpointer applied_token;
 
-// the one ClientState of all text-input applications
-static ClientState wl_cs;
-static gboolean wl_cs_inited;
+// The ClientState of each window, by the number wl-toplevel.c gave it (0:
+// windows it did not tell of, or all of them without a window list), and
+// that of the focused field's window (NULL until a field is focused)
+static GHashTable *window_states;
+static ClientState *wl_cs;
+// the focused window, as wl-toplevel.c told
+static guint focused_window;
 
 // the preedit the application has
 static char *shown_preedit;
@@ -101,6 +106,8 @@ enum {
     EVENT_MODIFIERS,
     EVENT_STATE,
     EVENT_UNAVAILABLE,
+    EVENT_WINDOW,
+    EVENT_WINDOW_CLOSED,
 };
 typedef struct {
     int type;
@@ -138,6 +145,14 @@ void wl_im_queue_modifiers (uint32_t depressed, uint32_t latched, uint32_t locke
 
 void wl_im_queue_unavailable (void) {
     queue_event (EVENT_UNAVAILABLE, 0, 0, 0, 0, NULL);
+}
+
+void wl_im_queue_window (guint window) {
+    queue_event (EVENT_WINDOW, window, 0, 0, 0, NULL);
+}
+
+void wl_im_queue_window_closed (guint window) {
+    queue_event (EVENT_WINDOW_CLOSED, window, 0, 0, 0, NULL);
 }
 
 static uint32_t now_ms (void) {
@@ -237,8 +252,8 @@ static void flush (void) {
         // e.g. after a mouse action, current_CS may be the connection of a
         // HIME tool; the preedit is ours
         ClientState *const cs = current_CS;
-        current_CS = &wl_cs;
-        hime_get_preedit (&wl_cs, str, attr, &cursor, &sub_comp_len);
+        current_CS = wl_cs;
+        hime_get_preedit (wl_cs, str, attr, &cursor, &sub_comp_len);
         current_CS = cs;
     }
     // as for HIME clients (do_get_preedit)
@@ -273,7 +288,7 @@ static void flush (void) {
 }
 
 gboolean wl_im_ready (void) {
-    return protocol && active && hime_focused_client () == &wl_cs;
+    return protocol && active && wl_cs && hime_focused_client () == wl_cs;
 }
 
 void wl_im_send (void) {
@@ -298,7 +313,7 @@ static void stop_repeat (void) {
 
 static gboolean process_press (uint32_t key) {
     const KeySym keysym = xkb_state_key_get_one_sym (xkb_state, key + 8);
-    current_CS = &wl_cs;
+    current_CS = wl_cs;
     save_CS_temp_to_current ();
     return ProcessKeyPress (keysym, x_state ());
 }
@@ -386,7 +401,7 @@ static void key_release (uint32_t time, uint32_t key) {
 
     if (!bypass) {
         const KeySym keysym = xkb_state_key_get_one_sym (xkb_state, key + 8);
-        current_CS = &wl_cs;
+        current_CS = wl_cs;
         save_CS_temp_to_current ();
         ProcessKeyRelease (keysym, x_state ());
         flush ();
@@ -433,14 +448,24 @@ static void stop_grab (void) {
     }
 }
 
-static void focus_in (void) {
-    if (!wl_cs_inited) {
-        wl_cs_inited = TRUE;
-        wl_cs.b_hime_protocol = TRUE;
-        wl_cs.input_style = InputStyleOverSpot;
-        wl_cs.use_preedit = TRUE;
-        hime_init_client_state (&wl_cs, TRUE);
+static ClientState *window_state (guint window) {
+    if (!window_states) {
+        window_states = g_hash_table_new_full (NULL, NULL, NULL, g_free);
     }
+    ClientState *cs = g_hash_table_lookup (window_states, GUINT_TO_POINTER (window));
+    if (!cs) {
+        cs = g_new0 (ClientState, 1);
+        cs->b_hime_protocol = TRUE;
+        cs->input_style = InputStyleOverSpot;
+        cs->use_preedit = TRUE;
+        hime_init_client_state (cs, TRUE);
+        g_hash_table_insert (window_states, GUINT_TO_POINTER (window), cs);
+    }
+    return cs;
+}
+
+static void focus_in (void) {
+    wl_cs = window_state (focused_window);
 
     // the application has dropped its preedit
     g_free (shown_preedit);
@@ -449,9 +474,9 @@ static void focus_in (void) {
 
     // another field: drop what was typed into the last one
     hime_reset ();
-    hime_FocusIn (&wl_cs);
+    hime_FocusIn (wl_cs);
     if (bypass) {
-        hide_in_win (&wl_cs);
+        hide_in_win (wl_cs);
     }
 }
 
@@ -460,19 +485,60 @@ static void focus_in (void) {
 static void focus_out (void) {
     // a HIME client got the focus in the meantime: it is its engine and
     // window now
-    if (hime_focused_client () != &wl_cs) {
+    if (hime_focused_client () != wl_cs) {
         return;
     }
     // current_CS may be a HIME tool's connection, or none
     ClientState *const cs = current_CS;
-    current_CS = &wl_cs;
+    current_CS = wl_cs;
     hime_reset ();
     clear_output_buffer ();
-    hime_FocusOut (&wl_cs);
+    hime_FocusOut (wl_cs);
     // also when hime_FocusOut skips it, as for a quick second focus out
-    hide_in_win (&wl_cs);
+    hide_in_win (wl_cs);
     hide_win_sym ();
-    current_CS = cs ? cs : &wl_cs;
+    current_CS = cs ? cs : wl_cs;
+}
+
+// The focused field is in another window than the state it uses, e.g. the
+// compositor told of the window after the field: use that window's state.
+// The application does not know, and keeps the preedit: clear it.
+static void switch_window (void) {
+    dbg ("wl-im: window %u\n", focused_window);
+    stop_repeat ();
+    focus_out ();
+    flush ();
+    focus_in ();
+}
+
+static void window_focused (guint window) {
+    focused_window = window;
+    // Keep the state when no window has the focus (as the field is still
+    // focused, e.g. a window of the compositor's shell is)
+    if (window && active && wl_cs != window_state (window)) {
+        switch_window ();
+    }
+}
+
+static void window_closed (guint window) {
+    ClientState *const cs = window_states ? g_hash_table_lookup (window_states, GUINT_TO_POINTER (window)) : NULL;
+    if (!cs) {
+        return;
+    }
+    if (cs == wl_cs) {
+        if (active) {
+            // the field goes away with the window
+            focused_window = 0;
+            switch_window ();
+        } else {
+            wl_cs = NULL;
+        }
+    }
+    if (current_CS == cs) {
+        current_CS = NULL;
+    }
+    hime_forget_client (cs);
+    g_hash_table_remove (window_states, GUINT_TO_POINTER (window));
 }
 
 static void apply_state (gboolean new_active, gboolean password, gboolean activated, gpointer token) {
@@ -562,6 +628,12 @@ static void handle_events (void) {
                 become_unavailable ();
             }
             break;
+        case EVENT_WINDOW:
+            window_focused (arg[0]);
+            break;
+        case EVENT_WINDOW_CLOSED:
+            window_closed (arg[0]);
+            break;
         }
         g_free (event);
     }
@@ -640,8 +712,9 @@ static void registry_global (void *data, struct wl_registry *registry, uint32_t 
     if (!xkb_context) {
         xkb_context = xkb_context_new (XKB_CONTEXT_NO_FLAGS);
     }
-    if (!wl_im_v2_global (registry, name, interface, version)) {
-        wl_im_v1_global (registry, name, interface, version);
+    if (!wl_im_v2_global (registry, name, interface, version) &&
+        !wl_im_v1_global (registry, name, interface, version)) {
+        wl_toplevel_global (registry, name, interface, version);
     }
 }
 

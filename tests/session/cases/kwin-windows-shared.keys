@@ -1,0 +1,6 @@
+@program gtk3-text-input-test
+@compositor kwin
+@conf hime-single-state=1
+# As wl-im-windows-shared.keys, with KWin's input-method-v1 and window
+# list: with hime-single-state, all windows share the input state.
+C-<space> x @check @exec gtk3-text-input-test:a:<space> y @check

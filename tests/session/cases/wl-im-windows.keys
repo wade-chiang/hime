@@ -1,0 +1,7 @@
+@program gtk3-text-input-test
+@compositor sway
+# Each window has an input state of its own, as with fcitx5 (the
+# compositor tells which window has the focus): Control+Space in the first
+# window leaves a second one in Chinese, and the first one is still in
+# English when it gets the focus back.
+C-<space> x @check @exec gtk3-text-input-test:a:<space> y @check

@@ -71,6 +71,11 @@ void wl_im_queue_state (gboolean active, gboolean password, gboolean activated, 
 void wl_im_queue_key (uint32_t time, uint32_t key, uint32_t state);
 void wl_im_queue_modifiers (uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group);
 
+// The focused window changed to the one numbered WINDOW (0: none known),
+// or the window WINDOW was closed (wl-toplevel.c)
+void wl_im_queue_window (guint window);
+void wl_im_queue_window_closed (guint window);
+
 // the keymap (wl_keyboard.keymap) and repeat info of the keyboard grab
 void wl_im_grab_keymap (uint32_t format, int32_t fd, uint32_t size);
 void wl_im_grab_repeat_info (int32_t rate, int32_t delay);
@@ -83,5 +88,8 @@ gboolean wl_im_v2_global (struct wl_registry *registry, uint32_t name, const cha
                           uint32_t version);
 gboolean wl_im_v1_global (struct wl_registry *registry, uint32_t name, const char *interface,
                           uint32_t version);
+// the compositor's window list
+gboolean wl_toplevel_global (struct wl_registry *registry, uint32_t name, const char *interface,
+                             uint32_t version);
 
 #endif /* HIME_WL_IM_PRIVATE_H */
