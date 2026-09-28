@@ -303,6 +303,9 @@ static void hime_engine_focus_in (IBusEngine *ibus_engine) {
         return;
     }
     hime_engine_open (engine);
+    // A new connection (another application's) takes the cursor in screen
+    // coordinates only once it asked for that
+    watch_notifications (engine);
     if (engine->hime_ch) {
         hime_im_client_focus_in (engine->hime_ch);
         // it may have come before (no connection yet, or while not
