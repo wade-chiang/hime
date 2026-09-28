@@ -224,6 +224,18 @@ Known gaps after phase 1 (from review, not fixed yet):
 - The GTK modules assume GDK was built with the X11 backend.
 - Qt 5 on Wayland is untested (qt5-wayland is not installed here).
 
+Open items after phase 6:
+
+- A real Plasma test must check that KWin offers
+  plasma-window-management to the daemon it starts
+  (`X-KDE-Wayland-Interfaces` in `menu/hime-wayland.desktop`): the
+  session tests disable KWin's permission checks
+  (`KWIN_WAYLAND_NO_PERMISSION_CHECKS`), so they cannot tell. Without
+  it, all windows share one input state there, silently.
+- `module-symbols-gnome` failed once in a full `make check-session` run
+  and passed six times alone; the cause is unknown (it uses the IM
+  module and mouse clicks, not hime-ibus).
+
 ## Gotchas
 
 - Do not add `-DGTK_DISABLE_DEPRECATED` to GTK 3 builds: HIME still calls
