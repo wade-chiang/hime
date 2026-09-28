@@ -176,8 +176,10 @@ hime_pids() {
 
 # must not fail: under set -e that would replace the exit status
 keyboard_pid=""
+portal_pid=""
 cleanup() {
     [[ -n "$keyboard_pid" ]] && { kill "$keyboard_pid" 2>/dev/null || true; }
+    [[ -n "$portal_pid" ]] && { kill "$portal_pid" 2>/dev/null || true; }
     kill $(hime_pids) 2>/dev/null || true
     kill "$mutter_pid" 2>/dev/null || true
     wait 2>/dev/null || true
@@ -261,6 +263,15 @@ if [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
     "$here/rd-type.py" --keep &
     keyboard_pid=$!
     wait_for '[[ -p "$XDG_RUNTIME_DIR/rd-type.fifo" ]]' 
+    # GNOME's portal backend, which asks GNOME Shell for the focused
+    # application each time it changes (hime-ibus reads the replies)
+    if [[ -x /usr/lib/xdg-desktop-portal-gnome ]]; then
+        WAYLAND_DISPLAY="$wl_display" /usr/lib/xdg-desktop-portal-gnome >"$tmp/portal.log" 2>&1 &
+        portal_pid=$!
+        wait_for 'gdbus call --session -d org.freedesktop.DBus -o /org/freedesktop/DBus \
+            -m org.freedesktop.DBus.NameHasOwner org.freedesktop.impl.portal.desktop.gnome |
+            grep -q true' || true
+    fi
     # the shell starts in the overview, where new windows get no focus
     shell_eval 'Main.overview.hide()' >/dev/null
     wait_for 'shell_eval "Main.overview.visible || Main.overview.animationInProgress" | grep -q "false"'

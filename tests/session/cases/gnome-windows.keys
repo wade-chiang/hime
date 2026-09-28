@@ -1,0 +1,10 @@
+@program gtk3-text-input-test
+@compositor gnome
+# As wl-im-windows.keys, through GNOME's IBus (hime-ibus), which learns the
+# focused application from GNOME Shell's replies to its portal: each
+# application has an input state of its own (each window of the test,
+# which has no .desktop file, is an application of its own for GNOME
+# Shell).  Control+Space in the first window leaves a second one in
+# Chinese, and the first one is still in English when it gets the focus
+# back.
+C-<space> x @check @exec gtk3-text-input-test:a:<space> y @check

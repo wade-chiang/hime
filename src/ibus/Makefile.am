@@ -18,9 +18,11 @@ CFLAGS += $(OPTFLAGS) $(IBUSINC) \
 .PHONY: all
 all: hime-ibus hime.xml
 
-hime-ibus: hime-ibus.o ../im-client/libhime-im-client.so
+OBJS = hime-ibus.o gnome-app-monitor.o
+
+hime-ibus: $(OBJS) ../im-client/libhime-im-client.so
 	@echo "linking $@ ..."
-	$(CC) $(gcc_ld_run_path) hime-ibus.o -L../im-client -lhime-im-client -o $@ $(IBUSLIBS)
+	$(CC) $(gcc_ld_run_path) $(OBJS) -L../im-client -lhime-im-client -o $@ $(IBUSLIBS)
 
 # the paths are those of the installed files
 hime.xml: hime.xml.in

@@ -26,7 +26,10 @@
 //
 // IBus starts it as hime.xml says (--ibus).  Each IBus input context gets
 // an engine, with a daemon connection of its own; GNOME Shell uses one for
-// all text-input applications.
+// all text-input applications.  So that each application has an input
+// state of its own (as the modules have, one connection each), the engine
+// uses a connection for each application GNOME Shell focuses
+// (gnome-app-monitor.c).
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +39,7 @@
 #include <glib-unix.h>
 #include <ibus.h>
 
+#include "gnome-app-monitor.h"
 #include "hime-im-client.h"
 
 // IBus modifier bits above the X ones (IBUS_RELEASE_MASK, IBUS_SUPER_MASK,
@@ -76,13 +80,25 @@ typedef struct {
     // the text cursor, below which HIME's window goes (OverSpot)
     gboolean has_cursor;
     int cursor_x, cursor_y;
+
+    // the application the connection (hime_ch, flags_fd) is for, and the
+    // other applications' connections (AppConnection)
+    char *app;
+    GHashTable *apps;
 } HimeEngine;
+
+typedef struct {
+    HIME_client_handle *hime_ch;
+    int flags_fd;
+} AppConnection;
 
 typedef struct {
     IBusEngineClass parent;
 } HimeEngineClass;
 
 G_DEFINE_TYPE (HimeEngine, hime_engine, IBUS_TYPE_ENGINE)
+
+static GList *engines;
 
 static void hime_engine_open (HimeEngine *engine) {
     if (engine->hime_ch) {
@@ -340,6 +356,74 @@ static void hime_engine_set_cursor_location (IBusEngine *ibus_engine, gint x, gi
     after_request (engine);
 }
 
+static void app_connection_free (gpointer data) {
+    AppConnection *connection = data;
+    if (connection->hime_ch) {
+        hime_im_client_close (connection->hime_ch);
+    }
+    g_free (connection);
+}
+
+static void stop_watching (HimeEngine *engine) {
+    if (engine->notify_source) {
+        g_source_remove (engine->notify_source);
+        engine->notify_source = 0;
+        engine->notify_fd = 0;
+    }
+    if (engine->pending_source) {
+        g_source_remove (engine->pending_source);
+        engine->pending_source = 0;
+    }
+}
+
+// Use the connection of APP ("": not known).  A field stays focused (the
+// application's focus in may come before GNOME Shell tells which one it
+// is): its keys typed go, and HIME's window follows the other state.
+static void use_app (HimeEngine *engine, const char *app) {
+    if (!strcmp (app, engine->app)) {
+        return;
+    }
+    DBG ("application \"%s\"\n", app);
+    const gboolean focused = engine->focused;
+    if (focused) {
+        hime_engine_focus_out (IBUS_ENGINE (engine));
+    }
+    stop_watching (engine);
+    if (engine->hime_ch) {
+        AppConnection *connection = g_new (AppConnection, 1);
+        connection->hime_ch = engine->hime_ch;
+        connection->flags_fd = engine->flags_fd;
+        g_hash_table_replace (engine->apps, g_strdup (engine->app), connection);
+    }
+    AppConnection *connection = g_hash_table_lookup (engine->apps, app);
+    engine->hime_ch = connection ? connection->hime_ch : NULL;
+    engine->flags_fd = connection ? connection->flags_fd : 0;
+    if (connection) {
+        // taken back
+        connection->hime_ch = NULL;
+        g_hash_table_remove (engine->apps, app);
+    }
+    g_free (engine->app);
+    engine->app = g_strdup (app);
+    if (focused) {
+        hime_engine_focus_in (IBUS_ENGINE (engine));
+        // the application's preedit was the other state's
+        update_preedit (engine);
+    }
+}
+
+static gboolean app_gone (gpointer key, gpointer value, gpointer data) {
+    return !gnome_app_monitor_running (key);
+}
+
+static void apps_changed (void) {
+    for (GList *l = engines; l; l = l->next) {
+        HimeEngine *engine = l->data;
+        use_app (engine, gnome_app_monitor_focused ());
+        g_hash_table_foreach_remove (engine->apps, app_gone, NULL);
+    }
+}
+
 // With has-focus-id (see create_engine): IBus moves its global engine to a
 // "fake" input context of its own when no text field is focused: that is
 // no focus for HIME (its window would stay, and mouse actions commit
@@ -350,6 +434,9 @@ static void hime_engine_focus_in_id (IBusEngine *ibus_engine, const gchar *objec
     if (client && !strncmp (client, "fake", 4)) {
         hime_engine_focus_out (ibus_engine);
         return;
+    }
+    if (!((HimeEngine *) ibus_engine)->focused) {
+        use_app ((HimeEngine *) ibus_engine, gnome_app_monitor_focused ());
     }
     hime_engine_focus_in (ibus_engine);
 }
@@ -396,18 +483,14 @@ static void hime_engine_set_content_type (IBusEngine *ibus_engine, guint purpose
 
 static void hime_engine_destroy (IBusObject *object) {
     HimeEngine *engine = (HimeEngine *) object;
-    if (engine->notify_source) {
-        g_source_remove (engine->notify_source);
-        engine->notify_source = 0;
-    }
-    if (engine->pending_source) {
-        g_source_remove (engine->pending_source);
-        engine->pending_source = 0;
-    }
+    engines = g_list_remove (engines, engine);
+    stop_watching (engine);
     if (engine->hime_ch) {
         hime_im_client_close (engine->hime_ch);
         engine->hime_ch = NULL;
     }
+    g_clear_pointer (&engine->apps, g_hash_table_unref);
+    g_clear_pointer (&engine->app, g_free);
     g_free (engine->preedit);
     engine->preedit = NULL;
     IBUS_OBJECT_CLASS (hime_engine_parent_class)->destroy (object);
@@ -428,6 +511,9 @@ static void hime_engine_class_init (HimeEngineClass *klass) {
 }
 
 static void hime_engine_init (HimeEngine *engine) {
+    engine->app = g_strdup ("");
+    engine->apps = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, app_connection_free);
+    engines = g_list_prepend (engines, engine);
 }
 
 // Engines with has-focus-id, so that IBus tells which input context gets
@@ -468,6 +554,7 @@ int main (int argc, char **argv) {
     ibus_factory_add_engine (factory, "hime", hime_engine_get_type ());
     g_signal_connect (factory, "create-engine", G_CALLBACK (create_engine), NULL);
     ibus_bus_request_name (bus, "org.freedesktop.IBus.Hime", 0);
+    gnome_app_monitor_start (apps_changed);
 
     ibus_main ();
     return 0;

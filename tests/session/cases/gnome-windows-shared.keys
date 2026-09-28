@@ -1,0 +1,6 @@
+@program gtk3-text-input-test
+@compositor gnome
+@conf hime-single-state=1
+# As gnome-windows.keys, with hime-single-state: all applications share the
+# input state.
+C-<space> x @check @exec gtk3-text-input-test:a:<space> y @check
