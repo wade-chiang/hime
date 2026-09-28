@@ -27,10 +27,10 @@
 // wlroots compositors, niri, Hyprland) and input-method-v1 (wl-im-v1.c:
 // KWin).  Each window of the text-input applications has a ClientState of
 // its own, as each window of an X client has, when the compositor tells
-// which one has the focus (wl-toplevel.c).  The input method runs on GDK's own Wayland connection: its
-// windows must be on the one of the input method (popups), and wlroots
-// only lets the virtual keyboard of that connection past the keyboard
-// grab.
+// which one has the focus (wl-toplevel.c).  The input method runs on
+// GDK's own Wayland connection: its windows must be on the one of the input
+// method (popups), and wlroots only lets the virtual keyboard of that
+// connection past the keyboard grab.
 
 #include <string.h>
 #include <sys/mman.h>
@@ -323,7 +323,7 @@ static gboolean repeat_cb (gpointer data) {
     if (handling) {
         return G_SOURCE_CONTINUE;
     }
-    if (!protocol || !active || bypass || repeat_rate <= 0) {
+    if (!protocol || !active || !wl_cs || bypass || repeat_rate <= 0) {
         repeat_source = 0;
         return G_SOURCE_REMOVE;
     }
@@ -485,7 +485,7 @@ static void focus_in (void) {
 static void focus_out (void) {
     // a HIME client got the focus in the meantime: it is its engine and
     // window now
-    if (hime_focused_client () != wl_cs) {
+    if (!wl_cs || hime_focused_client () != wl_cs) {
         return;
     }
     // current_CS may be a HIME tool's connection, or none
@@ -514,25 +514,30 @@ static void switch_window (void) {
 static void window_focused (guint window) {
     focused_window = window;
     // Keep the state when no window has the focus (as the field is still
-    // focused, e.g. a window of the compositor's shell is)
-    if (window && active && wl_cs != window_state (window)) {
+    // focused, e.g. a window of the compositor's shell is).  Only focus_in
+    // creates a state: that switches the input method.
+    if (window && active &&
+        (!window_states || wl_cs != g_hash_table_lookup (window_states, GUINT_TO_POINTER (window)))) {
         switch_window ();
     }
 }
 
 static void window_closed (guint window) {
+    // the next field is in another window, which the compositor may tell of
+    // after the field
+    if (window == focused_window) {
+        focused_window = 0;
+    }
     ClientState *const cs = window_states ? g_hash_table_lookup (window_states, GUINT_TO_POINTER (window)) : NULL;
     if (!cs) {
         return;
     }
     if (cs == wl_cs) {
-        if (active) {
-            // the field goes away with the window
-            focused_window = 0;
-            switch_window ();
-        } else {
-            wl_cs = NULL;
-        }
+        // the field goes away with the window: its deactivate, or the next
+        // field's activate, comes next
+        stop_repeat ();
+        focus_out ();
+        wl_cs = NULL;
     }
     if (current_CS == cs) {
         current_CS = NULL;
@@ -599,8 +604,9 @@ static void handle_events (void) {
         const uint32_t *arg = event->arg;
         switch (event->type) {
         case EVENT_KEY:
-            // keys queued before the grab was released
-            if (!protocol || !active || !have_keymap ()) {
+            // keys queued before the grab was released, or after the
+            // field's window closed
+            if (!protocol || !active || !wl_cs || !have_keymap ()) {
                 break;
             }
             if (arg[2] == WL_KEYBOARD_KEY_STATE_PRESSED) {

@@ -20,10 +20,10 @@
 // list, so that each window of the text-input applications has an input
 // state of its own (as fcitx5 does): wlr-foreign-toplevel-management
 // (wlroots compositors, niri, Hyprland, labwc) or KDE's
-// plasma-window-management (KWin, which offers it to the input method it
-// started).  Windows are told apart by a number of their own (the
-// objects' addresses come back).  Without either protocol, all windows
-// share one state.
+// plasma-window-management (KWin offers it to the clients whose desktop
+// file lists it in X-KDE-Wayland-Interfaces: hime-wayland.desktop).
+// Windows are told apart by a number of their own (the objects' addresses
+// come back).  Without either protocol, all windows share one state.
 
 #include <string.h>
 

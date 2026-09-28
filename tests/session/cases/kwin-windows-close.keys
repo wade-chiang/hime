@@ -1,0 +1,9 @@
+@program gtk3-text-input-test
+@compositor kwin
+@conf hime-edit-display=2
+@conf hime-on-the-spot-key=1
+# As wl-im-windows-close.keys, with KWin's input-method-v1 and window list:
+# A second window closes while keys typed into it wait in its preedit: the
+# first window gets the focus back with its own state (English), and the
+# second window's input is gone.
+C-<space> x @exec gtk3-text-input-test:a:@check y @check C-<space> a <space> @check
