@@ -186,8 +186,18 @@ keeping HIME's own UI and typing feel. Phases:
    connection (as fcitx5 5.1.23), and hime-ibus keeps a daemon
    connection per application (`use_app ()`). `hime-single-state`
    still shares one state. Tests: `*-windows*` cases open a second
-   window with `@exec gtk3-text-input-test:KEYS`. Left: XIM while the
-   daemon runs on the Wayland backend.
+   window with `@exec gtk3-text-input-test:KEYS`. Done: XIM while the
+   daemon runs on the Wayland backend (`src/xim-wayland.c`): its own
+   Xlib connection to DISPLAY (`xim_dpy`, which is `dpy` on the X11
+   backend), opened in a thread (xwayland-satellite starts Xwayland on
+   the first client), read by a GSource; libX11 >= 1.7
+   (`HIME_XIM_WAYLAND`); ICs use the fixed position; mouse
+   actions commit with IMCommitString (`xim_wayland_ready/send`, part
+   of `hime_notify_ready/send`); virtual keyboard keys go through the
+   engine; when the X server goes away the ICs are dropped and it
+   reconnects with backoff. `HIME_NO_XIM=1` turns it off. Tests:
+   `@xwayland @x11` with `xim-test` (an Xlib XIM client) on sway and
+   KWin, `xim-restart.sh` kills the session's Xwayland.
 
 Both input window styles must work on Wayland and stay switchable at
 runtime from hime-setup, as on X11 (`hime-input-style`, applied by
@@ -313,6 +323,17 @@ Known gaps after phase 1 (from review, not fixed yet):
 - The GNOME test session starts `/usr/lib/xdg-desktop-portal-gnome`
   itself (per-application state needs it); test windows without a
   .desktop file are each an application (`window:N`) for GNOME Shell.
+- A GSource for an Xlib connection: XPending does not notice a hung up
+  connection (and a round trip then loops), while GLib keeps dispatching
+  a source whose fd polls HUP: mark the display
+  (`flags |= XlibDisplayIOError`) and return G_SOURCE_REMOVE.
+- IMdkit cached the XIM_SERVERS atom in a static; atoms differ on a new
+  X server, so it is looked up each time now.
+- Xwayland (with libei) drops a client's first XTest event, and KWin's
+  Xwayland sends XTest through KWin's input emulation, which needs a
+  permission: the daemon on Wayland does not use XTest.
+- XIM clients send keys only after a trigger key (Ctrl+Space) turned the
+  input method on.
 - On niri, `niri msg -j layers` shows the daemon's surfaces (namespace
   `hime`, Overlay, keyboard interactivity None). A test daemon can run in
   the user's live session without touching theirs: private

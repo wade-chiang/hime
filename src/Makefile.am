@@ -137,7 +137,7 @@ OBJS_tsin2gtab_phrase = hime-tsin2gtab-phrase.o \
 if USE_XIM
 IMdkitLIB   = IMdkit/lib/libXimd.a
 CFLAGS     += -DUSE_XIM=1
-OBJS       += IC.o
+OBJS       += IC.o xim-wayland.o
 endif
 
 if USE_SYSTEM_TRAY
@@ -258,7 +258,7 @@ endif
 # links the daemon objects except the X11 main program and the gtab
 # window, which harness.c replaces with recorders.
 GTAB_HARNESS = ../tests/gtab/gtab-harness
-GTAB_HARNESS_OBJS = $(filter-out hime.o win-gtab.o,$(OBJS))
+GTAB_HARNESS_OBJS = $(filter-out hime.o win-gtab.o xim-wayland.o,$(OBJS))
 
 ../tests/gtab/harness.o: ../tests/gtab/harness.c
 	$(CC) $(CFLAGS) -I. -c -o $@ $<
@@ -319,9 +319,18 @@ $(WL_TYPE): ../tests/session/wl-type.c virtual-keyboard-unstable-v1-client-proto
 	$(CC) -Wall -I. -o $@ $< virtual-keyboard-unstable-v1-protocol.c \
 		fake-input-protocol.c `pkg-config --cflags --libs wayland-client xkbcommon glib-2.0`
 
+# An X11 application typing through XIM, with the daemon on Wayland
+XIM_TEST = ../tests/session/xim-test
+
+$(XIM_TEST): ../tests/session/xim-test.c
+	$(CC) -Wall -o $@ $< -lX11
+
 WL_IM_TESTS =
 if USE_WAYLAND_IM
 WL_IM_TESTS += $(WL_TYPE) $(WL_CLICK) $(GTK3_TEXT_INPUT_TEST)
+if USE_XIM
+WL_IM_TESTS += $(XIM_TEST)
+endif
 endif
 
 .PHONY: session-test-programs
@@ -480,7 +489,7 @@ clean:
 		$(DATA) .depend $(PROGS_SYM) hime.log hime-fedora.spec \
 		$(GTAB_HARNESS) ../tests/gtab/harness.o $(HIME_CLIENT_TEST) \
 		$(GTK3_IM_TEST) $(GTK4_IM_TEST) $(GTK3_TEXT_INPUT_TEST) \
-		$(GTK4_TEXT_INPUT_TEST) $(QT6_TEXT_INPUT_TEST) $(WL_TYPE) $(WL_CLICK) \
+		$(GTK4_TEXT_INPUT_TEST) $(QT6_TEXT_INPUT_TEST) $(WL_TYPE) $(WL_CLICK) $(XIM_TEST) \
 		*-client-protocol.h *-protocol.c
 	@find . '(' -name '.ted*' -o -name '*~' -o -name 'core.*' -o -name 'vgcore.*' ')' -exec rm {} \;
 

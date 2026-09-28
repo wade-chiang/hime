@@ -426,8 +426,9 @@ static int SetXi18nSelectionOwner (Xi18n i18n_core) {
         return False;
     i18n_core->address.selection = atom;
 
-    if (XIM_Servers == None)
-        XIM_Servers = XInternAtom (dpy, XIM_SERVERS, False);
+    // not cached: the X server may be another one each time (the daemon on
+    // Wayland serves XIM again after Xwayland restarted)
+    XIM_Servers = XInternAtom (dpy, XIM_SERVERS, False);
     /*endif*/
     XGetWindowProperty (dpy,
                         root,

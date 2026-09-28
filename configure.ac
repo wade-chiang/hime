@@ -486,6 +486,16 @@ AS_IF(
     AC_SUBST([GTKLDFLAGS], ["$GTKLDFLAGS $LAYER_SHELL_LIBS"])
   ]
 )
+# XIM_WAYLAND: XIM while the daemon runs on GDK's Wayland backend, which
+# needs libX11 >= 1.7 (XSetIOErrorExitHandler) to outlive the X server
+AS_IF(
+  [test "x$enable_layer_shell" = "xyes" -a "x$enable_xim" = "xyes"],
+  [PKG_CHECK_EXISTS(
+    [x11 >= 1.7],
+    [AC_SUBST([GTKINC], ["$GTKINC -DHIME_XIM_WAYLAND=1"])],
+    [AC_MSG_WARN([libX11 < 1.7: no XIM while the daemon runs on Wayland])]
+  )]
+)
 # WAYLAND_IM: the daemon as a Wayland input method (input-method-v2), when
 # it runs on GDK's Wayland backend, i.e. with layer-shell
 AS_IF(

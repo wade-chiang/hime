@@ -111,6 +111,21 @@ gboolean hime_launched_by_compositor (void) {
     return FALSE;
 }
 
+#if USE_XIM
+Display *xim_dpy;
+#endif
+
+/* ---- XIM on Wayland, normally xim-wayland.c --------------------------- */
+
+#if USE_XIM && HIME_XIM_WAYLAND
+gboolean xim_wayland_ready (void) {
+    return FALSE;
+}
+
+void xim_wayland_send (void) {
+}
+#endif
+
 /* ---- gtab window, normally win-gtab.c --------------------------------- */
 
 GtkWidget *win_gtab;

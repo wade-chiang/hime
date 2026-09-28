@@ -40,6 +40,8 @@ HIME 作為 Wayland 輸入法（text-input 程式，不經 HIME module）：
 | Qt 6（`QT_IM_MODULE=wayland`） | sway、KWin 6.7、GNOME 50 | FeatherPad（niri 26.04） |
 | 其他 text-input 程式 | — | foot（niri 26.04、GNOME 50） |
 
+純 X11 程式（沒有 GTK/Qt IM module，經 XIM）：HIME 跑在 Wayland 上時，於 sway 與 KWin 6.7 的 Xwayland 自動測試過；GNOME 上 HIME 本來就跑在 Xwayland。
+
 以上程式在 niri 26.04 與 GNOME 50（經 IBus）上也實測過「跟著游標」：HIME 的輸入視窗出現在文字游標下方（Ghostty、foot、gnome-text-editor、FeatherPad）。KDE Plasma 尚未實機測試。
 
 ### 安裝
@@ -157,7 +159,7 @@ Ghostty 預設只跑一個程式實例：已經有 Ghostty 在執行時，用不
 - 作為 Wayland 輸入法時，候選字等屬性（底線、反白）不會顯示在程式的預編輯文字中：協定不支援。
 - 作為 Wayland 輸入法時，焦點離開輸入欄位時尚未送出的字（例如詞音的整句）會被丟棄：協定不接受失去焦點後送出的文字。
 - 輸入法選單（在輸入視窗上按滑鼠中鍵）在 layer-shell 上尚未處理。
-- HIME 跑在 Wayland 上時（niri、KDE Plasma 等）不提供 XIM，沒有 GTK/Qt IM module 的純 X11 程式無法使用 HIME。
+- HIME 跑在 Wayland 上時（niri、KDE Plasma 等），純 X11 程式經 XIM 輸入：輸入視窗固定位置；需按 Ctrl+Space 開啟輸入法後才會輸入中文（和 X11 上的 XIM 相同）；在這類程式中，虛擬鍵盤的修飾鍵與 Backspace 等鍵無法傳給程式。HIME 會連上 Xwayland，所以 niri 登入時就會啟動 Xwayland；設定 `HIME_NO_XIM=1` 可以關閉。
 - GTK 4 程式的 AltGr 修飾鍵不會傳給 HIME。
 - Chromium、Electron 程式在原生 Wayland 下尚未測試。
 

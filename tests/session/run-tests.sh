@@ -19,6 +19,8 @@
 #                   instead of mutter
 #   @conf NAME=VALUE write a hime config value
 #   @outputs N      number of outputs of the sway session
+#   @xwayland       give the sway or KWin session an Xwayland (with @x11, the
+#                   client runs there)
 #   @method NAME    make a module (intcode, chewing, anthy), Zhuyin (pho)
 #                   or tsin the default input method
 #
@@ -67,6 +69,7 @@ for keys in "${cases[@]}"; do
     daemon_backend=""
     compositor=""
     outputs=""
+    xwayland=""
     method=""
     confs=""
     while read -r directive arg; do
@@ -79,6 +82,7 @@ for keys in "${cases[@]}"; do
         @daemon-wayland) daemon_backend=wayland ;;
         @compositor) compositor="$arg" ;;
         @outputs) outputs="$arg" ;;
+        @xwayland) xwayland=1 ;;
         @method) method="$arg" ;;
         @conf) confs="$confs $arg" ;;
         esac
@@ -101,6 +105,7 @@ for keys in "${cases[@]}"; do
     status=0
     HIME_SESSION_X11="$x11" HIME_SESSION_DAEMON_BACKEND="$daemon_backend" \
         HIME_SESSION_COMPOSITOR="$compositor" HIME_SESSION_OUTPUTS="$outputs" \
+        HIME_SESSION_XWAYLAND="$xwayland" \
         HIME_SESSION_METHOD="$method" \
         HIME_CONF="$confs" \
         "$here/run-session.sh" "${cmd[@]}" \

@@ -34,6 +34,7 @@
 #include "hime-protocol.h"
 #include "im-srv.h"
 #include "wl-im.h"
+#include "xim-wayland.h"
 
 #define DBG 0
 
@@ -173,7 +174,7 @@ static int notify_fd (void) {
 // Can text be committed to the focused client without a key event from it?
 // Also true for Wayland text-input fields (wl-im.c).
 gboolean hime_notify_ready (void) {
-    return notify_fd () >= 0 || wl_im_ready ();
+    return notify_fd () >= 0 || wl_im_ready () || xim_wayland_ready ();
 }
 
 // Send the output buffer (text to commit, possibly none) to the focused
@@ -181,6 +182,10 @@ gboolean hime_notify_ready (void) {
 void hime_notify_send (void) {
     if (wl_im_ready ()) {
         wl_im_send ();
+        return;
+    }
+    if (xim_wayland_ready ()) {
+        xim_wayland_send ();
         return;
     }
     const int fd = notify_fd ();

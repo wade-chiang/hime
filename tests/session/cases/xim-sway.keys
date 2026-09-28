@@ -1,0 +1,11 @@
+@program xim-test
+@compositor sway
+@xwayland
+@x11
+# An X11 application without a HIME module on Xwayland, with the daemon on
+# Wayland (layer-shell, no X display of GDK's): it types through XIM, as on
+# X11: the client sends keys once Control+Space (a trigger key) turned the
+# input method on.  Shift types English; Control+Space turns it off and
+# on.  A mouse action (as a click on the symbol table) commits to it
+# directly, and virtual keyboard keys go through the engine.
+a C-<space> b 1 a <space> @check S-h S-i C-<space> a C-<space> a <space> @check @hook commit 好 @check @hook key b @hook key 1

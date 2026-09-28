@@ -38,6 +38,9 @@
 
 extern Display *dpy;
 #if USE_XIM
+extern Display *xim_dpy;
+#endif
+#if USE_XIM
 extern XIMS current_ims;
 static IMForwardEventStruct *current_forward_eve;
 #endif
@@ -338,7 +341,7 @@ void export_text_xim () {
   text = outbuf;
   XmbTextListToTextProperty(dpy, &text, 1, XCompoundTextStyle, &tp);
 #else
-    Xutf8TextListToTextProperty (dpy, &text, 1, XCompoundTextStyle, &tp);
+    Xutf8TextListToTextProperty (xim_dpy, &text, 1, XCompoundTextStyle, &tp);
 #endif
 
 #if DEBUG && 0
@@ -557,9 +560,9 @@ void move_IC_in_win (ClientState *cs) {
         // Without an X window (a native Wayland client), or without an X
         // display to map it on, the spot location cannot be mapped to the
         // screen: use the fixed position.  Only for
-        // the current HIME protocol client; an XIM IC without a window yet
-        // must not move the input window of the focused one.
-        if (cs->b_hime_protocol && cs == current_CS) {
+        // the current client; on X, an XIM IC without a window yet must not
+        // move the input window of the focused one.
+        if ((cs->b_hime_protocol || !dpy) && cs == current_CS) {
             move_in_win (cs, hime_root_x, hime_root_y);
         }
         return;
@@ -1318,8 +1321,18 @@ gboolean ProcessKeyRelease (KeySym keysym, uint32_t kev_state) {
 }
 
 #if USE_XIM
+IC *FindIC (CARD16 icid);
+
 int xim_ForwardEventHandler (IMForwardEventStruct *call_data) {
     current_forward_eve = call_data;
+
+    // the key's IC, also when another client became current_CS in the
+    // meantime (a HIME tool's connection while it is set up)
+    IC *ic = FindIC (call_data->icid);
+    if (ic) {
+        current_CS = &ic->cs;
+        save_CS_temp_to_current ();
+    }
 
     if (call_data->event.type != KeyPress && call_data->event.type != KeyRelease) {
 #if DEBUG || 1
@@ -1463,6 +1476,7 @@ int xim_hime_FocusIn (IMChangeFocusStruct *call_data) {
     connect_id = call_data->connect_id;
 
     if (ic) {
+        ic->xim_focused = TRUE;
         hime_FocusIn (cs);
 
         load_IC (ic);
@@ -1537,9 +1551,11 @@ void hime_reset (void) {
 #if USE_XIM
 int xim_hime_FocusOut (IMChangeFocusStruct *call_data) {
     IC *ic = FindIC (call_data->icid);
-    ClientState *cs = &ic->cs;
-
-    hime_FocusOut (cs);
+    if (!ic) {
+        return True;
+    }
+    ic->xim_focused = FALSE;
+    hime_FocusOut (&ic->cs);
 
     return True;
 }

@@ -6722,6 +6722,25 @@ fi
 
 
 fi
+# XIM_WAYLAND: XIM while the daemon runs on GDK's Wayland backend, which
+# needs libX11 >= 1.7 (XSetIOErrorExitHandler) to outlive the X server
+if test "x$enable_layer_shell" = "xyes" -a "x$enable_xim" = "xyes"
+then :
+  if test -n "$PKG_CONFIG" && \
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"x11 >= 1.7\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "x11 >= 1.7") 2>&5
+  ac_status=$?
+  printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  GTKINC="$GTKINC -DHIME_XIM_WAYLAND=1"
+
+else
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: WARNING: libX11 < 1.7: no XIM while the daemon runs on Wayland" >&5
+printf '%s\n' "$as_me: WARNING: libX11 < 1.7: no XIM while the daemon runs on Wayland" >&2;}
+
+fi
+
+fi
 # WAYLAND_IM: the daemon as a Wayland input method (input-method-v2), when
 # it runs on GDK's Wayland backend, i.e. with layer-shell
 if test "x$enable_layer_shell" = "xyes"

@@ -34,6 +34,7 @@ static IC *ic_list = (IC *) NULL;
 static IC *free_list = (IC *) NULL;
 
 void move_IC_in_win (ClientState *cs);
+extern Window focus_win;
 
 static void free_IC_list (IC *list) {
     while (list) {
@@ -70,6 +71,31 @@ static IC
     return rec;
 }
 
+// the IC whose ClientState CS is (NULL: none, e.g. a HIME client's)
+IC *find_IC_of_client (ClientState *cs) {
+    for (IC *rec = ic_list; rec; rec = rec->next) {
+        if (&rec->cs == cs) {
+            return rec;
+        }
+    }
+    return NULL;
+}
+
+// The XIM server is gone with its display (xim-wayland.c): so are its ICs,
+// and the X windows it knew (a new X server has others by the same ids)
+void forget_all_IC (void) {
+    for (IC *rec = ic_list; rec; rec = rec->next) {
+        if (&rec->cs == current_CS) {
+            hide_in_win (&rec->cs);
+            current_CS = NULL;
+        }
+        hime_forget_client (&rec->cs);
+    }
+    free_all_IC ();
+    ic_list = free_list = NULL;
+    focus_win = 0;
+}
+
 IC *FindIC (CARD16 icid) {
     IC *rec = ic_list;
 
@@ -93,7 +119,10 @@ void DeleteIC (CARD16 icid) {
 
             if (&rec->cs == current_CS) {
                 hide_in_win (&rec->cs);
+                // its memory goes to another IC
+                current_CS = NULL;
             }
+            hime_forget_client (&rec->cs);
 
             if (last != NULL)
                 last->next = rec->next;
@@ -285,6 +314,7 @@ void CreateIC (IMChangeICStruct *call_data) {
 
     StoreIC (rec, call_data);
     call_data->icid = rec->id;
+    rec->connect_id = call_data->connect_id;
     load_IC (rec);
 #if DEBUG && 0
     dbg ("CreateIC  .. exit\n");

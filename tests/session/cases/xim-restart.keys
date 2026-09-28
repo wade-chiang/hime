@@ -1,0 +1,7 @@
+@program xim-restart.sh
+@compositor sway
+@xwayland
+@x11
+# The X server goes away (e.g. Xwayland restarted): the daemon, on Wayland,
+# keeps running and serves XIM on the next one.
+a C-<space> b 1 a <space>

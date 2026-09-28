@@ -24,6 +24,9 @@
 # Wayland backend.  Screenshots can be taken with grim.  With
 # HIME_SESSION_OUTPUTS=2 it has two 1280x800 outputs side by side.
 #
+# With HIME_SESSION_XWAYLAND=1, sway and KWin run an Xwayland, on which the
+# daemon (still on Wayland) serves XIM.
+#
 # With HIME_SESSION_COMPOSITOR=kwin it is a headless KWin (virtual
 # backend, no Xwayland), which starts the daemon itself as its input method
 # (--inputmethod), as Plasma does; key injection and screenshots are
@@ -36,8 +39,8 @@
 # GNOME session, the daemon runs on its Xwayland (no layer-shell).
 #
 # GTK and Qt applications pick up the HIME IM modules from the build tree.
-# With HIME_SESSION_X11=1, COMMAND runs as an X11 client on mutter's
-# Xwayland instead.
+# With HIME_SESSION_X11=1, COMMAND runs as an X11 client on the
+# compositor's Xwayland instead.
 
 set -euo pipefail
 [[ -n "${HIME_SESSION_TRACE:-}" ]] && set -x
@@ -117,13 +120,20 @@ log="$tmp/compositor.log"
 daemon_env=(HIME_TABLE_DIR="$top/data" HIME_TEST_HOOKS=1 HIME_MODULE_DIR="$top/src/modules")
 
 if [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]]; then
-    # KWin starts the daemon (in the foreground) on a connection of its own
+    # KWin starts the daemon (in the foreground) on a connection of its own;
+    # with an Xwayland, it tells the daemon the display
+    inputmethod="env ${daemon_env[*]} $top/src/hime"
+    xwayland=""
+    if [[ "${HIME_SESSION_XWAYLAND:-}" == 1 ]]; then
+        xwayland=--xwayland
+        inputmethod="sh -c 'echo \"\$DISPLAY\" >$tmp/kwin-display; exec $inputmethod'"
+    fi
     KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 \
         KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 \
         KWIN_XKB_DEFAULT_KEYMAP=true XKB_DEFAULT_LAYOUT=us \
         kwin_wayland --virtual --width 1280 --height 800 --socket wl-hime-test \
-        --no-lockscreen --no-global-shortcuts --no-kactivities \
-        --inputmethod "env ${daemon_env[*]} $top/src/hime" >"$log" 2>&1 &
+        --no-lockscreen --no-global-shortcuts --no-kactivities $xwayland \
+        --inputmethod "$inputmethod" >"$log" 2>&1 &
 elif [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
     if [[ ! -x "$top/src/ibus/hime-ibus" ]]; then
         echo "run-session.sh: src/ibus/hime-ibus not built" >&2
@@ -151,9 +161,16 @@ elif [[ "${HIME_SESSION_COMPOSITOR:-}" == gnome ]]; then
     gnome-shell --headless --wayland --unsafe-mode --wayland-display=wl-hime-test \
         --virtual-monitor 1280x800 >"$log" 2>&1 &
 elif [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
+    xwayland="xwayland disable"
+    if [[ "${HIME_SESSION_XWAYLAND:-}" == 1 ]]; then
+        # sway tells its clients the display (Xwayland's socket is in the
+        # global /tmp/.X11-unix)
+        xwayland="xwayland force
+exec echo \"\$DISPLAY\" >$tmp/sway-display"
+    fi
     printf '%s\n' 'output HEADLESS-1 resolution 1280x800 position 0 0' \
         'output HEADLESS-2 resolution 1280x800 position 1280 0' \
-        'xwayland disable' >"$tmp/sway.config"
+        "$xwayland" >"$tmp/sway.config"
     # sway names its socket itself (wayland-N, the only one in our
     # private XDG_RUNTIME_DIR); there is no swaybg for the background
     WLR_HEADLESS_OUTPUTS="${HIME_SESSION_OUTPUTS:-1}" \
@@ -218,6 +235,15 @@ if [[ "${HIME_SESSION_COMPOSITOR:-}" == sway ]]; then
 fi
 
 x_display="$(sed -n 's/.*Using public X11 display \(:[0-9]*\).*/\1/p' "$log" | head -1)"
+if [[ "${HIME_SESSION_XWAYLAND:-}" == 1 ]]; then
+    display_file="$tmp/sway-display"
+    [[ "${HIME_SESSION_COMPOSITOR:-}" == kwin ]] && display_file="$tmp/kwin-display"
+    if ! wait_for 'grep -q : "$display_file" 2>/dev/null'; then
+        echo "run-session.sh: the compositor started no Xwayland" >&2
+        exit 77
+    fi
+    x_display="$(cat "$display_file")"
+fi
 x_auth="$(ls "$XDG_RUNTIME_DIR"/.mutter-Xwaylandauth.* 2>/dev/null | head -1 || true)"
 
 daemon_env+=(WAYLAND_DISPLAY="$wl_display" HIME_DAEMON=1)

@@ -72,7 +72,9 @@ typedef struct {
 
 typedef struct _IC {
 #if USE_XIM
-    CARD16 id; /* ic id */
+    CARD16 id;         /* ic id */
+    CARD16 connect_id; /* the client's connection */
+    gboolean xim_focused; /* between XIM's set and unset IC focus */
 #endif
     Window focus_win; /* focus window */
 #if USE_XIM

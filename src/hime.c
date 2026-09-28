@@ -68,6 +68,10 @@ static void start_inmd_window () {
 #if USE_XIM
 char *lc;
 
+// The display of the XIM server: GDK's on the X11 backend, a connection of
+// its own on the Wayland backend (xim-wayland.c), NULL without X
+Display *xim_dpy;
+
 static XIMStyle Styles[] = {
 #if 1
     XIMPreeditCallbacks | XIMStatusCallbacks,  // OnTheSpot
@@ -234,7 +238,8 @@ int hime_ProtoHandler (XIMS ims, IMProtocol *call_data) {
     return True;
 }
 
-void open_xim () {
+// The XIM server on DISPLAY, owned by WIN
+XIMS open_xim (Display *display, Window win) {
     XIMTriggerKeys triggerKeys;
 
     im_styles.supported_styles = Styles;
@@ -248,8 +253,8 @@ void open_xim () {
 
     char *xim_name = get_hime_xim_name ();
 
-    XIMS xims = IMOpenIM (dpy,
-                          IMServerWindow, xim_xwin,  // input window
+    XIMS xims = IMOpenIM (display,
+                          IMServerWindow, win,  // input window
                           IMModifiers, "Xi18n",      // X11R6 protocol
                           IMServerName, xim_name,    // XIM server name
                           IMLocale, lc,
@@ -262,9 +267,15 @@ void open_xim () {
                           NULL);
 
     if (xims == NULL) {
+        // on the Wayland backend, XIM is not the main way in
+        if (display != dpy) {
+            fprintf (stderr, "hime: IMOpenIM '%s' failed: no XIM for X11 applications\n", xim_name);
+            return NULL;
+        }
         p_err ("IMOpenIM '%s' failed. Maybe another XIM server is running.\n",
                xim_name);
     }
+    return xims;
 }
 
 #endif  // if USE_XIM
@@ -290,6 +301,7 @@ gboolean init_in_method (int in_no);
 #include "hime-protocol.h"
 #include "im-srv.h"
 #include "wl-im.h"
+#include "xim-wayland.h"
 
 static int get_in_method_by_filename (char filename[]) {
     int i, in_method = 0;
@@ -830,7 +842,8 @@ int main (int argc, char **argv) {
 
     if (dpy) {
 #if USE_XIM
-        open_xim ();
+        xim_dpy = dpy;
+        open_xim (dpy, xim_xwin);
 #endif
 
         gdk_window_add_filter (NULL, my_gdk_filter, NULL);
@@ -851,6 +864,11 @@ int main (int argc, char **argv) {
 
     init_hime_im_serv (xim_xwin);
     wl_im_init ();
+#if USE_XIM
+    if (!dpy) {
+        xim_wayland_init ();
+    }
+#endif
 
     exec_setup_scripts ();
 
