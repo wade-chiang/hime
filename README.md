@@ -40,7 +40,7 @@ HIME 作為 Wayland 輸入法（text-input 程式，不經 HIME module）：
 | Qt 6（`QT_IM_MODULE=wayland`） | sway、KWin 6.7、GNOME 50 | FeatherPad（niri 26.04） |
 | 其他 text-input 程式 | — | foot（niri 26.04、GNOME 50） |
 
-純 X11 程式（沒有 GTK/Qt IM module，經 XIM）：HIME 跑在 Wayland 上時，於 sway 與 KWin 6.7 的 Xwayland 自動測試過；GNOME 上 HIME 本來就跑在 Xwayland。
+純 X11 程式（沒有 GTK/Qt IM module，經 XIM）：HIME 跑在 Wayland 上時，於 sway 與 KWin 6.7 的 Xwayland 自動測試過，並在 niri 26.04（xwayland-satellite）以 xterm 實際使用過；GNOME 上 HIME 本來就跑在 Xwayland。
 
 以上程式在 niri 26.04 與 GNOME 50（經 IBus）上也實測過「跟著游標」：HIME 的輸入視窗出現在文字游標下方（Ghostty、foot、gnome-text-editor、FeatherPad）。KDE Plasma 尚未實機測試。
 
