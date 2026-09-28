@@ -80,7 +80,18 @@ GTK 4 與 Qt 的 module 目錄依發行版而異（例如 Debian 在 `/usr/lib/x
 
 ### 設定
 
-建立 `~/.config/environment.d/hime.conf`：
+建立 `~/.config/environment.d/hime.conf`。建議和 fcitx5 相同的設定：GTK 程式與 Qt 6 程式透過合成器輸入（text-input），輸入視窗跟著游標；Qt 5 程式透過 HIME 的 IM module，純 X11 程式透過 XIM（限制見「已知限制」）。
+
+```
+QT_IM_MODULE=hime
+QT_IM_MODULES=wayland;hime
+XMODIFIERS=@im=hime
+```
+
+- 不設定 `GTK_IM_MODULE`：GTK 在 Wayland 上會自動使用 text-input。
+- `QT_IM_MODULES` 只有 Qt 6 會讀，它會先用 text-input；Qt 5 只讀 `QT_IM_MODULE`，使用 HIME 的 module。
+
+若想讓所有程式都透過 HIME 的 IM module 輸入（和 X11 上一樣，輸入視窗固定位置，每個程式各自記住中英狀態），改用：
 
 ```
 GTK_IM_MODULE=hime
@@ -89,13 +100,14 @@ QT_IM_MODULES=hime
 XMODIFIERS=@im=hime
 ```
 
-`environment.d` 只在 systemd 使用者服務啟動時讀取。若登出再登入後沒有生效（例如還有其他登入中的 session），可以直接設定後重新登入：
+`environment.d` 只在 systemd 使用者服務啟動時讀取。若登出再登入後沒有生效（例如還有其他登入中的 session），可以直接設定後重新登入（不要的變數用 `systemctl --user unset-environment` 移除）：
 
 ```bash
-systemctl --user set-environment GTK_IM_MODULE=hime QT_IM_MODULE=hime QT_IM_MODULES=hime XMODIFIERS=@im=hime
+systemctl --user set-environment QT_IM_MODULE=hime 'QT_IM_MODULES=wayland;hime' XMODIFIERS=@im=hime
+systemctl --user unset-environment GTK_IM_MODULE
 ```
 
-HIME 會在第一次打字時自動啟動。
+HIME 會在第一次透過 IM module 打字時自動啟動；GNOME（IBus）與 KDE Plasma（KWin）也會自動啟動 HIME。照建議設定時，niri 等合成器上多半沒有程式透過 IM module，需要在合成器設定中登入時啟動 HIME，例如 niri 的 `spawn-at-startup "hime"`。
 
 #### GNOME
 
@@ -115,7 +127,7 @@ GNOME 登入時會把 `QT_IM_MODULE`、`QT_IM_MODULES`、`XMODIFIERS` 設成 IBu
 HIME 也會成為合成器的輸入法，兩種方式可以同時使用：
 
 - 有設定 `GTK_IM_MODULE=hime`、`QT_IM_MODULE=hime` 的程式，照舊透過 HIME 的 IM module 輸入。
-- 其他使用 text-input 的程式（foot、Chromium 等）直接透過合成器輸入。若想讓 GTK、Qt 程式也改走這條路，可以不設定上述變數，或設為 `GTK_IM_MODULE=wayland`、`QT_IM_MODULE=wayland`。
+- 其他使用 text-input 的程式（foot、Chromium，以及照建議設定時的 GTK 與 Qt 6 程式）直接透過合成器輸入。
 
 Ghostty 預設只跑一個程式實例：已經有 Ghostty 在執行時，用不同環境變數再開，只會在原本的程式裡多開一個視窗，沿用原本的設定。要測試時可加上 `--gtk-single-instance=false`。
 
