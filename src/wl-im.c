@@ -705,6 +705,10 @@ static void hime_popup_window_init (HimePopupWindow *win) {
 
 GtkWidget *wl_im_popup_window_new (void) {
     GtkWidget *win = g_object_new (hime_popup_window_get_type (), "type", GTK_WINDOW_TOPLEVEL, NULL);
+    // GTK draws a title bar (and a close button) on a toplevel when the
+    // compositor offers no server-side decorations (KDE's protocol, which
+    // niri has not); gtk-layer-shell drops it for the other windows
+    gtk_window_set_decorated (GTK_WINDOW (win), FALSE);
     gtk_widget_realize (win);
     // no xdg role: the window gets the popup role when it is mapped
     gdk_wayland_window_set_use_custom_surface (gtk_widget_get_window (win));

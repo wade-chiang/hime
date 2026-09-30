@@ -300,6 +300,14 @@ Open items after phase 6:
   `HIME_IBUS_DEBUG=FILE` logs what hime-ibus sees.
 - The daemon ignores a focus out within 100 ms of another
   (`hime_FocusOut`); a focus in in between now resets that.
+- GTK 3 on Wayland draws a title bar with a close button (client-side
+  decorations) on every decorated toplevel unless the compositor offers
+  KDE's server-decoration protocol: sway and KWin do, niri does not.
+  gtk-layer-shell drops it for layer surfaces; `HimePopupWindow` is not
+  decorated. The session tests cannot see it (sway and KWin), and
+  `GTK_CSD` has no effect on Wayland.
+- at-spi2-core's registry daemon prints to stdout when D-Bus starts it:
+  the test sessions set `NO_AT_BRIDGE=1 GTK_A11Y=none`.
 - A popup surface's wl_surface must not be destroyed before its role:
   GtkWindow's unmap destroys it, and gtk-layer-shell overrides that class
   handler for every window, so signal handlers and emission hooks run too
