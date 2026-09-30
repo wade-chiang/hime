@@ -104,6 +104,8 @@ if [[ "${HIME_SESSION_INNER:-}" != 1 ]]; then
     export XMODIFIERS=@im=ibus
     # no gvfs daemons, which would leave a gvfs directory behind
     export GIO_USE_VFS=local
+    # no accessibility bus: its registry daemon prints to the tests' output
+    export NO_AT_BRIDGE=1 GTK_A11Y=none
     exec dbus-run-session -- "$0" "$@"
 fi
 
