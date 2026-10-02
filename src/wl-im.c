@@ -692,6 +692,16 @@ typedef struct {
 G_DEFINE_TYPE (HimePopupWindow, hime_popup_window, GTK_TYPE_WINDOW)
 
 static void hime_popup_window_unmap (GtkWidget *win) {
+    // Unmap the surface first: niri does not draw the screen again when
+    // the popup's role and surface are destroyed, and the window stays
+    // until the application under it draws (in Ghostty, until the cursor
+    // blinks)
+    GdkWindow *window = gtk_widget_get_window (win);
+    struct wl_surface *surface = window ? gdk_wayland_window_get_wl_surface (window) : NULL;
+    if (surface && g_object_get_data (G_OBJECT (win), "hime-popup-surface")) {
+        wl_surface_attach (surface, NULL, 0, 0);
+        wl_surface_commit (surface);
+    }
     g_object_set_data (G_OBJECT (win), "hime-popup-surface", NULL);
     GTK_WIDGET_CLASS (hime_popup_window_parent_class)->unmap (win);
 }

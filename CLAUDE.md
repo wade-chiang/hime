@@ -306,6 +306,22 @@ Open items after phase 6:
   gtk-layer-shell drops it for layer surfaces; `HimePopupWindow` is not
   decorated. The session tests cannot see it (sway and KWin), and
   `GTK_CSD` has no effect on Wayland.
+- niri does not draw the screen again when an input popup's role and
+  surface are destroyed: the window stays until the application under it
+  draws (Ghostty: at the next cursor blink). `HimePopupWindow` unmaps the
+  surface (a NULL buffer) first.
+- The compositor places an input popup at the cursor rectangle the
+  application last sent. GTK 4 sends it only after the input method
+  committed text or changed the preedit, Ghostty only updates it with a
+  key event it gets, and Chromium is late too: with the keys shown only
+  in HIME's window, the popup of the first character shows where the
+  cursor was before. Showing the keys in the application
+  (`hime-edit-display=2`, `hime-on-the-spot-key=1`) makes it tell. Qt
+  tells by itself.
+- niri can be tested here: a nested niri (winit backend) runs inside a
+  headless sway with `WLR_RENDERER=gles2`; `wl-type` on sway types into
+  it (the first key of each virtual keyboard is lost), `grim` on sway
+  takes the screenshots.
 - at-spi2-core's registry daemon prints to stdout when D-Bus starts it:
   the test sessions set `NO_AT_BRIDGE=1 GTK_A11Y=none`.
 - A popup surface's wl_surface must not be destroyed before its role:
